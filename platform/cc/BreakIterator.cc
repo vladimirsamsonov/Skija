@@ -32,7 +32,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_BreakIterator__
   (JNIEnv* env, jclass jclass, jlong ptr) {
     UBreakIterator* instance = reinterpret_cast<UBreakIterator*>(static_cast<uintptr_t>(ptr));
     UErrorCode status = U_ZERO_ERROR;
-    UBreakIterator* clone = ubrk_safeClone(instance, nullptr, 0, &status);
+    UBreakIterator* clone = ubrk_clone(instance, &status);
     if (U_FAILURE(status)) {
       env->ThrowNew(java::lang::RuntimeException::cls, u_errorName(status));
       return 0;
@@ -101,8 +101,8 @@ extern "C" JNIEXPORT jintArray JNICALL Java_io_github_humbleui_skija_BreakIterat
     int32_t len = ubrk_getRuleStatusVec(instance, nullptr, 0, &status);
     if (U_FAILURE(status))
       env->ThrowNew(java::lang::RuntimeException::cls, u_errorName(status));
-    std::vector<jint> vec(len);
-    ubrk_getRuleStatusVec(instance, reinterpret_cast<int32_t*>(vec.data()), len, &status);
+    std::vector<int32_t> vec(len);
+    ubrk_getRuleStatusVec(instance, vec.data(), len, &status);
     if (U_FAILURE(status))
       env->ThrowNew(java::lang::RuntimeException::cls, u_errorName(status));
     return javaIntArray(env, vec);

@@ -1,14 +1,18 @@
 #include <iostream>
 #include <jni.h>
 #include "../interop.hh"
+#include "../FontMgr.hh"
 #include "interop.hh"
 #include "FontRunIterator.hh"
-#include "SkShaper.h"
-#include "src/base/SkUTF.h"
 #include "TextLineRunHandler.hh"
 #include "RunIterators.hh"
+#include "src/base/SkUTF.h"
 #include "unicode/ubidi.h"
-#include "SkUnicode.h"
+#include "modules/skshaper/include/SkShaper.h"
+#include "modules/skshaper/include/SkShaper_harfbuzz.h"
+#include "modules/skshaper/utils/FactoryHelpers.h"
+#include "modules/skunicode/include/SkUnicode.h"
+#include "modules/skunicode/include/SkUnicode_icu.h"
 
 static void deleteShaper(SkShaper* instance) {
     // std::cout << "Deleting [SkShaper " << instance << "]" << std::endl;
@@ -27,34 +31,48 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__
 extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMakeShaperDrivenWrapper
   (JNIEnv* env, jclass jclass, jlong fontMgrPtr) {
     SkFontMgr* fontMgr = reinterpret_cast<SkFontMgr*>(static_cast<uintptr_t>(fontMgrPtr));
-    return reinterpret_cast<jlong>(SkShaper::MakeShaperDrivenWrapper(sk_ref_sp(fontMgr)).release());
+    return reinterpret_cast<jlong>(SkShapers::HB::ShaperDrivenWrapper(SkUnicodes::ICU::Make(), sk_ref_sp(fontMgr)).release());
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMakeShapeThenWrap
   (JNIEnv* env, jclass jclass, jlong fontMgrPtr) {
     SkFontMgr* fontMgr = reinterpret_cast<SkFontMgr*>(static_cast<uintptr_t>(fontMgrPtr));
-    return reinterpret_cast<jlong>(SkShaper::MakeShapeThenWrap(sk_ref_sp(fontMgr)).release());
+    return reinterpret_cast<jlong>(SkShapers::HB::ShapeThenWrap(SkUnicodes::ICU::Make(), sk_ref_sp(fontMgr)).release());
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMakeShapeDontWrapOrReorder
   (JNIEnv* env, jclass jclass, jlong fontMgrPtr) {
     SkFontMgr* fontMgr = reinterpret_cast<SkFontMgr*>(static_cast<uintptr_t>(fontMgrPtr));
-    return reinterpret_cast<jlong>(SkShaper::MakeShapeDontWrapOrReorder(SkUnicode::MakeIcuBasedUnicode(), sk_ref_sp(fontMgr)).release());
+    return reinterpret_cast<jlong>(SkShapers::HB::ShapeDontWrapOrReorder(SkUnicodes::ICU::Make(), sk_ref_sp(fontMgr)).release());
 }
+
+#ifdef SK_SHAPER_CORETEXT_AVAILABLE
+#include "modules/skshaper/include/SkShaper_coretext.h"
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMakeCoreText
   (JNIEnv* env, jclass jclass) {
-    #ifdef SK_SHAPER_CORETEXT_AVAILABLE
-        return reinterpret_cast<jlong>(SkShaper::MakeCoreText().release());
-    #else
-        return 0;
-    #endif
+    return reinterpret_cast<jlong>(SkShapers::CT::CoreText().release());
 }
+
+#else
+
+extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMakeCoreText
+  (JNIEnv* env, jclass jclass) {
+    return 0;
+}
+
+#endif
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMake
   (JNIEnv* env, jclass jclass, jlong fontMgrPtr) {
     SkFontMgr* fontMgr = reinterpret_cast<SkFontMgr*>(static_cast<uintptr_t>(fontMgrPtr));
     return reinterpret_cast<jlong>(SkShaper::Make(sk_ref_sp(fontMgr)).release());
+}
+
+extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nMakeBestAvailable
+  (JNIEnv* env, jclass jclass, jlong fontMgrPtr) {
+    SkFontMgr* fontMgr = reinterpret_cast<SkFontMgr*>(static_cast<uintptr_t>(fontMgrPtr));
+    return reinterpret_cast<jlong>(SkShapers::BestAvailable()->makeShaper(sk_ref_sp(fontMgr)).release());
 }
 
 extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__1nShapeBlob
@@ -70,7 +88,7 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__
         text.c_str(),
         text.size(),
         *font,
-        SkFontMgr::RefDefault(),
+        skija::FontMgr_impl::RefDefault(),
         graphemeIter,
         env->GetBooleanField(opts, skija::shaper::ShapingOptions::_approximateSpaces),
         env->GetBooleanField(opts, skija::shaper::ShapingOptions::_approximatePunctuation)
@@ -109,8 +127,8 @@ extern "C" JNIEXPORT jlong JNICALL Java_io_github_humbleui_skija_shaper_Shaper__
         text.c_str(),
         text.size(),
         *font,
-        SkFontMgr::RefDefault(),
-        graphemeIter, 
+        skija::FontMgr_impl::RefDefault(),
+        graphemeIter,
         env->GetBooleanField(opts, skija::shaper::ShapingOptions::_approximateSpaces),
         env->GetBooleanField(opts, skija::shaper::ShapingOptions::_approximatePunctuation)));
     if (!fontRunIter) return 0;
@@ -162,7 +180,7 @@ public:
     }
 
     SkShaper::RunHandler::Buffer runBuffer(const SkShaper::RunHandler::RunInfo& info) {
-        fGlyphs    = std::vector<jshort>(info.glyphCount);
+        fGlyphs    = std::vector<SkGlyphID>(info.glyphCount);
         fPositions = std::vector<SkPoint>(info.glyphCount);
         fClusters  = std::vector<jint>(info.glyphCount);
 
@@ -205,7 +223,7 @@ private:
     JNIEnv* fEnv;
     jobject fRunHandler;
     skija::UtfIndicesConverter fIndicesConverter;
-    std::vector<jshort> fGlyphs;
+    std::vector<SkGlyphID> fGlyphs;
     std::vector<SkPoint> fPositions;
     std::vector<jint> fClusters;
 };

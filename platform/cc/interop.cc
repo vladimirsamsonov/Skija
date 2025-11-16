@@ -227,6 +227,84 @@ namespace skija {
         }
     }
 
+    namespace FontArguments {
+        jclass cls;
+        jfieldID collectionIndex;
+        jfieldID variations;
+        jfieldID paletteIndex;
+        jfieldID paletteOverrides;
+
+        void onLoad(JNIEnv* env) {
+            jclass local = env->FindClass("io/github/humbleui/skija/FontArguments");
+            cls = static_cast<jclass>(env->NewGlobalRef(local));
+            collectionIndex = env->GetFieldID(cls, "_collectionIndex", "I");
+            variations = env->GetFieldID(cls, "_variations", "[Lio/github/humbleui/skija/FontVariation;");
+            paletteIndex = env->GetFieldID(cls, "_paletteIndex", "I");
+            paletteOverrides = env->GetFieldID(cls, "_paletteOverrides", "[Lio/github/humbleui/skija/FontPaletteOverride;");
+        }
+
+        void onUnload(JNIEnv* env) {
+            env->DeleteGlobalRef(cls);
+        }
+
+        SkFontArguments toSkFontArguments(JNIEnv* env, jobject fontArgumentsObj) {
+            SkFontArguments args;
+
+            jint collectionIdx = env->GetIntField(fontArgumentsObj, collectionIndex);
+            args.setCollectionIndex(collectionIdx);
+
+            jobjectArray variationsArr = static_cast<jobjectArray>(env->GetObjectField(fontArgumentsObj, variations));
+            jsize variationCount = variationsArr == nullptr ? 0 : env->GetArrayLength(variationsArr);
+            if (variationCount > 0) {
+                // NOTE: heap allocation, call freeSkFontArguments
+                SkFontArguments::VariationPosition::Coordinate* coordinates = new SkFontArguments::VariationPosition::Coordinate[variationCount];
+                for (int i = 0; i < variationCount; ++i) {
+                    jobject jvar = env->GetObjectArrayElement(variationsArr, i);
+                    coordinates[i] = {
+                        static_cast<SkFourByteTag>(env->GetIntField(jvar, skija::FontVariation::tag)),
+                        env->GetFloatField(jvar, skija::FontVariation::value)
+                    };
+                    env->DeleteLocalRef(jvar);
+                }
+                args.setVariationDesignPosition({coordinates, variationCount});
+            }
+
+            jint paletteIdx = env->GetIntField(fontArgumentsObj, paletteIndex);
+            jobjectArray paletteOverridesArr = static_cast<jobjectArray>(env->GetObjectField(fontArgumentsObj, paletteOverrides));
+            jsize overrideCount = paletteOverridesArr == nullptr ? 0 : env->GetArrayLength(paletteOverridesArr);
+
+            if (overrideCount > 0) {
+                // NOTE: heap allocation, call freeSkFontArguments
+                SkFontArguments::Palette::Override* overrides = new SkFontArguments::Palette::Override[overrideCount];
+                for (int i = 0; i < overrideCount; ++i) {
+                    jobject joverride = env->GetObjectArrayElement(paletteOverridesArr, i);
+                    overrides[i] = {
+                        static_cast<uint16_t>(env->GetIntField(joverride, skija::FontPaletteOverride::index)),
+                        static_cast<SkColor>(env->GetIntField(joverride, skija::FontPaletteOverride::color))
+                    };
+                    env->DeleteLocalRef(joverride);
+                }
+                args.setPalette({paletteIdx, overrides, overrideCount});
+            } else if (paletteIdx != 0) {
+                args.setPalette({paletteIdx, nullptr, 0});
+            }
+
+            return args;
+        }
+
+        void freeSkFontArguments(SkFontArguments& args) {
+            auto variationPosition = args.getVariationDesignPosition();
+            if (variationPosition.coordinates != nullptr) {
+                delete[] variationPosition.coordinates;
+            }
+
+            auto palette = args.getPalette();
+            if (palette.overrides != nullptr) {
+                delete[] palette.overrides;
+            }
+        }
+    }
+
     namespace FontFeature {
         jclass cls;
         jmethodID ctor;
@@ -260,6 +338,23 @@ namespace skija {
                                static_cast<size_t>(env->GetLongField(featureObj.get(), skija::FontFeature::end))};
             }
             return features;
+        }
+    }
+
+    namespace FontPaletteOverride {
+        jclass cls;
+        jfieldID index;
+        jfieldID color;
+
+        void onLoad(JNIEnv* env) {
+            jclass local = env->FindClass("io/github/humbleui/skija/FontPaletteOverride");
+            cls = static_cast<jclass>(env->NewGlobalRef(local));
+            index = env->GetFieldID(cls, "_index", "I");
+            color = env->GetFieldID(cls, "_color", "I");
+        }
+
+        void onUnload(JNIEnv* env) {
+            env->DeleteGlobalRef(cls);
         }
     }
 
@@ -355,12 +450,27 @@ namespace skija {
         }
     }
 
+    namespace Image {
+        jclass cls;
+        jmethodID ctor;
+
+        void onLoad(JNIEnv* env) {
+            jclass local = env->FindClass("io/github/humbleui/skija/Image");
+            cls  = static_cast<jclass>(env->NewGlobalRef(local));
+            ctor = env->GetMethodID(cls, "<init>", "(J)V");
+        }
+
+        void onUnload(JNIEnv* env) {
+            env->DeleteGlobalRef(cls);
+        }
+    }
+
     namespace ImageInfo {
         jclass cls;
         jmethodID ctor;
 
         void onLoad(JNIEnv* env) {
-            jclass local = env->FindClass("io/github/humbleui/skija/ImageInfo");    
+            jclass local = env->FindClass("io/github/humbleui/skija/ImageInfo");
             cls   = static_cast<jclass>(env->NewGlobalRef(local));
             ctor = env->GetMethodID(cls, "<init>", "(IIIIJ)V");
         }
@@ -376,6 +486,28 @@ namespace skija {
                 static_cast<jint>(info.colorType()),
                 static_cast<jint>(info.alphaType()),
                 reinterpret_cast<jlong>(info.refColorSpace().release()));
+        }
+    }
+
+    namespace ImageWithFilterResult {
+        jclass cls;
+        jmethodID ctor;
+
+        void onLoad(JNIEnv* env) {
+            jclass local = env->FindClass("io/github/humbleui/skija/ImageWithFilterResult");
+            cls  = static_cast<jclass>(env->NewGlobalRef(local));
+            ctor = env->GetMethodID(cls, "<init>", "(Lio/github/humbleui/skija/Image;Lio/github/humbleui/types/IRect;Lio/github/humbleui/types/IPoint;)V");
+        }
+
+        void onUnload(JNIEnv* env) {
+            env->DeleteGlobalRef(cls);
+        }
+
+        jobject make(JNIEnv* env, SkImage* image, const SkIRect& subset, const SkIPoint& offset) {
+            jobject imageObj = env->NewObject(skija::Image::cls, skija::Image::ctor, reinterpret_cast<jlong>(image));
+            jobject subsetObj = types::IRect::fromSkIRect(env, subset);
+            jobject offsetObj = types::IPoint::fromSkIPoint(env, offset);
+            return env->NewObject(cls, ctor, imageObj, subsetObj, offsetObj);
         }
     }
 
@@ -467,6 +599,36 @@ namespace skija {
         }
     }
 
+    namespace RuntimeEffectUniformInfo {
+        jclass cls;
+        jmethodID ctor;
+
+        void onLoad(JNIEnv* env) {
+            jclass local = env->FindClass("io/github/humbleui/skija/RuntimeEffectUniformInfo");
+            cls  = static_cast<jclass>(env->NewGlobalRef(local));
+            ctor = env->GetMethodID(cls, "<init>", "(Ljava/lang/String;IIII)V");
+        }
+
+        void onUnload(JNIEnv* env) {
+            env->DeleteGlobalRef(cls);
+        }
+    }
+
+    namespace RuntimeEffectChildInfo {
+        jclass cls;
+        jmethodID ctor;
+
+        void onLoad(JNIEnv* env) {
+            jclass local = env->FindClass("io/github/humbleui/skija/RuntimeEffectChildInfo");
+            cls  = static_cast<jclass>(env->NewGlobalRef(local));
+            ctor = env->GetMethodID(cls, "<init>", "(Ljava/lang/String;II)V");
+        }
+
+        void onUnload(JNIEnv* env) {
+            env->DeleteGlobalRef(cls);
+        }
+    }
+
     namespace SamplingMode {
         SkSamplingOptions unpack(jlong val) {
             if (0x8000000000000000 & val) {
@@ -543,34 +705,46 @@ namespace skija {
         AnimationFrameInfo::onLoad(env);
         Color4f::onLoad(env);
         Drawable::onLoad(env);
+        FontArguments::onLoad(env);
         FontFamilyName::onLoad(env);
         FontFeature::onLoad(env);
         FontMetrics::onLoad(env);
         FontMgr::onLoad(env);
+        FontPaletteOverride::onLoad(env);
         FontVariation::onLoad(env);
         FontVariationAxis::onLoad(env);
+        Image::onLoad(env);
         ImageInfo::onLoad(env);
+        ImageWithFilterResult::onLoad(env);
         Path::onLoad(env);
         PathSegment::onLoad(env);
         PaintFilterCanvas::onLoad(env);
         RSXform::onLoad(env);
+        RuntimeEffectUniformInfo::onLoad(env);
+        RuntimeEffectChildInfo::onLoad(env);
         SurfaceProps::onLoad(env);
-        
+
         impl::Native::onLoad(env);
     }
 
     void onUnload(JNIEnv* env) {
         SurfaceProps::onUnload(env);
+        RuntimeEffectChildInfo::onUnload(env);
+        RuntimeEffectUniformInfo::onUnload(env);
         RSXform::onUnload(env);
         PaintFilterCanvas::onUnload(env);
         PathSegment::onUnload(env);
         Path::onUnload(env);
+        ImageWithFilterResult::onUnload(env);
         ImageInfo::onUnload(env);
+        Image::onUnload(env);
         FontVariationAxis::onUnload(env);
         FontVariation::onUnload(env);
+        FontPaletteOverride::onUnload(env);
         FontMgr::onUnload(env);
         FontMetrics::onUnload(env);
         FontFeature::onUnload(env);
+        FontArguments::onUnload(env);
         FontFamilyName::onUnload(env);
         Drawable::onUnload(env);
         Color4f::onUnload(env);
@@ -669,7 +843,7 @@ namespace types {
             return env->NewObject(cls, ctor, p.fX, p.fY);
         }
 
-        jobjectArray fromSkPoints(JNIEnv* env, const std::vector<SkPoint>& ps) {
+        jobjectArray fromSkPoints(JNIEnv* env, SkSpan<const SkPoint> ps) {
             jobjectArray res = env->NewObjectArray((jsize) ps.size(), cls, nullptr);
             for (int i = 0; i < ps.size(); ++i) {
                 skija::AutoLocal<jobject> pointObj(env, fromSkPoint(env, ps[i]));
@@ -998,6 +1172,14 @@ jstring javaString(JNIEnv* env, const char* chars) {
     return chars ? javaString(env, chars, strlen(chars)) : nullptr;
 }
 
+jstring javaString(JNIEnv* env, const std::string& str) {
+    return javaString(env, str.c_str(), str.size());
+}
+
+jstring javaString(JNIEnv* env, std::string_view str) {
+    return javaString(env, str.data(), str.size());
+}
+
 jobject javaFloat(JNIEnv* env, SkScalar val) {
     return env->NewObject(java::lang::Float::cls, java::lang::Float::ctor, val);
 }
@@ -1012,36 +1194,6 @@ jlong packIPoint(SkIPoint p) {
 
 jlong packISize(SkISize p) {
     return packTwoInts(p.fWidth, p.fHeight);
-}
-
-jbyteArray javaByteArray(JNIEnv* env, const std::vector<jbyte>& bytes) {
-    jbyteArray res = env->NewByteArray((jsize) bytes.size());
-    env->SetByteArrayRegion(res, 0, (jsize) bytes.size(), bytes.data());
-    return res;
-}
-
-jshortArray javaShortArray(JNIEnv* env, const std::vector<jshort>& shorts) {
-    jshortArray res = env->NewShortArray((jsize) shorts.size());
-    env->SetShortArrayRegion(res, 0, (jsize) shorts.size(), shorts.data());
-    return res;
-}
-
-jintArray javaIntArray(JNIEnv* env, const std::vector<jint>& ints) {
-    jintArray res = env->NewIntArray((jsize) ints.size());
-    env->SetIntArrayRegion( res, 0, (jsize) ints.size(), ints.data());
-    return res;
-}
-
-jlongArray javaLongArray(JNIEnv* env, const std::vector<jlong>& longs) {
-    jlongArray res = env->NewLongArray((jsize) longs.size());
-    env->SetLongArrayRegion(res, 0, (jsize) longs.size(), longs.data());
-    return res;
-}
-
-jfloatArray javaFloatArray(JNIEnv* env, const std::vector<jfloat>& floats) {
-    jfloatArray res = env->NewFloatArray((jsize) floats.size());
-    env->SetFloatArrayRegion(res, 0, (jsize) floats.size(), floats.data());
-    return res;
 }
 
 std::vector<SkString> skStringVector(JNIEnv* env, jobjectArray arr) {

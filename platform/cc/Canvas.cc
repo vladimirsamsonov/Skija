@@ -62,7 +62,7 @@ extern "C" JNIEXPORT void JNICALL Java_io_github_humbleui_skija_Canvas__1nDrawPo
     SkCanvas::PointMode skMode = static_cast<SkCanvas::PointMode>(mode);
     jsize len = env->GetArrayLength(coords);
     jfloat* arr = static_cast<jfloat*>(env->GetPrimitiveArrayCritical(coords, 0));
-    canvas->drawPoints(skMode, len / 2, reinterpret_cast<SkPoint*>(arr), *paint);
+    canvas->drawPoints(skMode, SkSpan(reinterpret_cast<SkPoint*>(arr), len / 2), *paint);
     env->ReleasePrimitiveArrayCritical(coords, arr, 0);
 }
 
@@ -383,21 +383,23 @@ extern "C" JNIEXPORT jint JNICALL Java_io_github_humbleui_skija_Canvas__1nSaveLa
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_github_humbleui_skija_Canvas__1nSaveLayerRec
-  (JNIEnv* env, jclass jclass, jlong ptr, jlong paintPtr, jlong backdropPtr, jint flags) {
+  (JNIEnv* env, jclass jclass, jlong ptr, jlong paintPtr, jlong backdropPtr, jint tileMode, jlong colorSpacePtr, jint flags) {
     SkCanvas* canvas = reinterpret_cast<SkCanvas*>(static_cast<uintptr_t>(ptr));
     SkPaint* paint = reinterpret_cast<SkPaint*>(static_cast<uintptr_t>(paintPtr));
     SkImageFilter* backdrop = reinterpret_cast<SkImageFilter*>(static_cast<uintptr_t>(backdropPtr));
-    SkCanvas::SaveLayerRec layerRec(nullptr, paint, backdrop, flags);
+    SkColorSpace* colorSpace = reinterpret_cast<SkColorSpace*>(static_cast<uintptr_t>(colorSpacePtr));
+    SkCanvas::SaveLayerRec layerRec(nullptr, paint, backdrop, static_cast<SkTileMode>(tileMode), colorSpace, flags);
     return canvas->saveLayer(layerRec);
 }
 
 extern "C" JNIEXPORT jint JNICALL Java_io_github_humbleui_skija_Canvas__1nSaveLayerRecRect
-  (JNIEnv* env, jclass jclass, jlong ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jlong paintPtr, jlong backdropPtr, jint flags) {
+  (JNIEnv* env, jclass jclass, jlong ptr, jfloat left, jfloat top, jfloat right, jfloat bottom, jlong paintPtr, jlong backdropPtr, jint tileMode, jlong colorSpacePtr, jint flags) {
     SkCanvas* canvas = reinterpret_cast<SkCanvas*>(static_cast<uintptr_t>(ptr));
     SkRect bounds {left, top, right, bottom};
     SkPaint* paint = reinterpret_cast<SkPaint*>(static_cast<uintptr_t>(paintPtr));
     SkImageFilter* backdrop = reinterpret_cast<SkImageFilter*>(static_cast<uintptr_t>(backdropPtr));
-    SkCanvas::SaveLayerRec layerRec(&bounds, paint, backdrop, flags);
+    SkColorSpace* colorSpace = reinterpret_cast<SkColorSpace*>(static_cast<uintptr_t>(colorSpacePtr));
+    SkCanvas::SaveLayerRec layerRec(&bounds, paint, backdrop, static_cast<SkTileMode>(tileMode), colorSpace, flags);
     return canvas->saveLayer(layerRec);
 }
 

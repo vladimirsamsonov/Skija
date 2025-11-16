@@ -71,8 +71,8 @@ public class ShadowsScene extends Scene {
         canvas.translate(0, 100);
         canvas.drawString("Shadow Utils", 350, 50, inter13, blackFill);
         try (var paint = new Paint().setColor(0xFFE54322);
-             var path = new Path().addRect(Rect.makeWH(50, 50));
-             var path2 = new Path().addRRect(RRect.makeXYWH(0, 0, 50, 50, 20));)
+             var path = new PathBuilder().addRect(Rect.makeWH(50, 50)).build();
+             var path2 = new PathBuilder().addRRect(RRect.makeXYWH(0, 0, 50, 50, 20)).build();)
         {
             var zPlaneParams = new Point3(0, 0, 100);
             var lightPos = new Point3(width / 2 * dpi, 0, 3000);
@@ -82,15 +82,15 @@ public class ShadowsScene extends Scene {
 
             canvas.save();
             canvas.translate(50, 25);
-            ShadowUtils.drawShadow(canvas, path, new Point3(0, 0, 100), lightPos, 1000, 0x40000000, spotColor, false, false);
+            ShadowUtils.drawShadow(canvas, path, new Point3(0, 0, 100), lightPos, 1000, 0x40000000, spotColor);
             canvas.drawPath(path, paint);
 
             canvas.translate(100, 0);
-            ShadowUtils.drawShadow(canvas, path2, new Point3(0, 0, 50), lightPos, 100, 0xFF000000, spotColor, false, false);
+            ShadowUtils.drawShadow(canvas, path2, new Point3(0, 0, 50), lightPos, 100, 0xFF000000, spotColor);
             canvas.drawPath(path2, paint);
 
             canvas.translate(100, 0);
-            ShadowUtils.drawShadow(canvas, path, new Point3(0, 0, 25), lightPos, 10, 0xFF000000, spotColor, false, false);
+            ShadowUtils.drawShadow(canvas, path, new Point3(0, 0, 25), lightPos, 10, 0xFF000000, spotColor);
             canvas.drawPath(path, paint);
 
             canvas.restore();

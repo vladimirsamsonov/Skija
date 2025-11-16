@@ -91,7 +91,7 @@ Platforms:
   - [ ] arm64
 - Linux:
   - [x] x64
-  - [x] arm64 (Experimental)
+  - [x] arm64
   - [ ] riscv64
 - macOS:
   - [x] x64
@@ -118,7 +118,7 @@ ColorSpace           ▓▓▓▓░░░░░░    PictureRecorder      ▓�
 Data                 ▓▓▓▓▓▓▓▓▓░    PixelRef             ▓▓▓▓▓▓▓▓▓▓
 Drawable             ▓▓▓▓▓▓▓▓░░    Pixmap               ▓▓▓▓▓▓▓▓▓▓
 Flattenable          ░░░░░░░░░░    Region               ▓▓▓▓▓▓▓▓▓▓
-Font                 ▓▓▓▓▓▓▓▓▓▓    RuntimeEffect        ▓▓▓▓▓░░░░░
+Font                 ▓▓▓▓▓▓▓▓▓▓    RuntimeEffect        ▓▓▓▓▓▓▓▓▓▓
 FontData             ░░░░░░░░░░    ScalerContext        ░░░░░░░░░░
 FontManager          ▓▓▓▓▓▓▓▓▓░    Shader               ▓▓▓▓▓▓▓▓▓▓
 FontStyle            ▓▓▓▓▓▓▓▓▓▓    ShadowUtils          ▓▓▓▓▓▓▓▓▓▓
@@ -181,7 +181,7 @@ Replace `${artifact}` and `${version}` with:
 |---------------|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Windows (x64) | `skija-windows-x64` | [![](https://img.shields.io/maven-central/v/io.github.humbleui/skija-windows-x64)](https://mvnrepository.com/artifact/io.github.humbleui/skija-windows-x64) |
 | Linux (x64)   | `skija-linux-x64`   | [![](https://img.shields.io/maven-central/v/io.github.humbleui/skija-linux-x64)](https://mvnrepository.com/artifact/io.github.humbleui/skija-linux-x64)     |
-| Linux (arm64) | `skija-linux-arm64` | [![](https://img.shields.io/maven-central/v/io.github.humbleui/skija-linux-arm64)](https://mvnrepository.com/artifact/io.github.humbleui/skija-linux-arm64) |
+| Linux (arm64)   | `skija-linux-arm64`   | [![](https://img.shields.io/maven-central/v/io.github.humbleui/skija-linux-arm64)](https://mvnrepository.com/artifact/io.github.humbleui/skija-linux-arm64)     |
 | macOS (x64)   | `skija-macos-x64`   | [![](https://img.shields.io/maven-central/v/io.github.humbleui/skija-macos-x64)](https://mvnrepository.com/artifact/io.github.humbleui/skija-macos-x64)     |
 | macOS (arm64) | `skija-macos-arm64` | [![](https://img.shields.io/maven-central/v/io.github.humbleui/skija-macos-arm64)](https://mvnrepository.com/artifact/io.github.humbleui/skija-macos-arm64) |
 

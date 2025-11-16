@@ -6,7 +6,7 @@ import common, build, build_utils
 def main():
   parser = argparse.ArgumentParser()
   parser.add_argument('--skija-version')
-  parser.add_argument('--jwm-version', default='0.4.15')
+  parser.add_argument('--jwm-version', default='0.4.20')
   parser.add_argument('--jwm-dir', default=None)
   (args, _) = parser.parse_known_args()
 
@@ -39,18 +39,20 @@ def main():
   os.chdir(common.basedir + '/examples/jwm')
 
   sources = build_utils.files('src/**/*.java', '../scenes/src/**/*.java')
-  build_utils.javac(sources, 'target/classes', classpath = classpath, release = '16', opts = ["-Xlint:deprecation", '-Xlint:-options',])
+  build_utils.javac(sources, 'target/classes', classpath = classpath, release = '16')
 
   # Java
   subprocess.check_call([
     'java',
-    '-classpath', build_utils.classpath_join(['target/classes'] + classpath)]
-    + ['-Djava.awt.headless=true',
+    '-classpath', build_utils.classpath_join(['target/classes'] + classpath),
+    '-Djava.awt.headless=true',
     '-enableassertions',
     '-enablesystemassertions',
+    *(['--enable-native-access=ALL-UNNAMED'] if build_utils.jdk_version()[0] >= 24 else []),
     '-Xcheck:jni',
     '-Dskija.logLevel=DEBUG',
-    'io.github.humbleui.skija.examples.jwm.Main'])
+    'io.github.humbleui.skija.examples.jwm.Main'
+  ])
 
   return 0
 

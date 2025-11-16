@@ -424,6 +424,22 @@ public class Canvas extends Managed {
         return this;
     }
 
+    /**
+     * Draws path and closes it immediately
+     */
+    @NotNull @Contract("_, _, _ -> this")
+    public Canvas drawPathOnce(@NotNull Path path, @NotNull Paint paint) {
+        assert _ptr != 0 : "Canvas is closed";
+        assert path != null : "Can’t drawPath with path == null";
+        assert paint != null : "Can’t drawPath with paint == null";
+        path.setVolatile(true);
+        Stats.onNativeCall();
+        _nDrawPath(_ptr, Native.getPtr(path), Native.getPtr(paint));
+        ReferenceUtil.reachabilityFence(paint);
+        path.close();
+        return this;
+    }
+
     @NotNull @Contract("_, _, _ -> this")
     public Canvas drawImage(@NotNull Image image, float left, float top) {
         return drawImageRect(image, Rect.makeWH(image.getWidth(), image.getHeight()), Rect.makeXYWH(left, top, image.getWidth(), image.getHeight()), SamplingMode.DEFAULT, null, true);
@@ -1414,9 +1430,9 @@ public class Canvas extends Managed {
             Stats.onNativeCall();
             Rect bounds = layerRec._bounds;
             if (bounds == null)
-                return _nSaveLayerRec(_ptr, Native.getPtr(layerRec._paint), Native.getPtr(layerRec._backdrop), layerRec._flags);
+                return _nSaveLayerRec(_ptr, Native.getPtr(layerRec._paint), Native.getPtr(layerRec._backdrop), layerRec._tileMode.ordinal(), Native.getPtr(layerRec._colorSpace), layerRec._flags);
             else
-                return _nSaveLayerRecRect(_ptr, bounds._left, bounds._top, bounds._right, bounds._bottom, Native.getPtr(layerRec._paint), Native.getPtr(layerRec._backdrop), layerRec._flags);
+                return _nSaveLayerRecRect(_ptr, bounds._left, bounds._top, bounds._right, bounds._bottom, Native.getPtr(layerRec._paint), Native.getPtr(layerRec._backdrop), layerRec._tileMode.ordinal(), Native.getPtr(layerRec._colorSpace), layerRec._flags);
         } finally {
             ReferenceUtil.reachabilityFence(this);
             ReferenceUtil.reachabilityFence(layerRec);
@@ -1505,8 +1521,8 @@ public class Canvas extends Managed {
     public static native int  _nSaveLayerRect(long ptr, float left, float top, float right, float bottom, long paintPtr);
     public static native int  _nSaveLayerAlpha(long ptr, int alpha);
     public static native int  _nSaveLayerAlphaRect(long ptr, float left, float top, float right, float bottom, int alpha);
-    public static native int  _nSaveLayerRec(long ptr, long paintPtr, long backdropPtr, int flags);
-    public static native int  _nSaveLayerRecRect(long ptr, float left, float top, float right, float bottom, long paintPtr, long backdropPtr, int flags);
+    public static native int  _nSaveLayerRec(long ptr, long paintPtr, long backdropPtr, int tileMode, long colorSpacePtr, int flags);
+    public static native int  _nSaveLayerRecRect(long ptr, float left, float top, float right, float bottom, long paintPtr, long backdropPtr, int tileMode, long colorSpacePtr, int flags);
     public static native int  _nGetSaveCount(long ptr);
     public static native void _nRestore(long ptr);
     public static native void _nRestoreToCount(long ptr, int saveCount);

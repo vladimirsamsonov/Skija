@@ -9,6 +9,7 @@ public class TestSuite {
         TestRunner.startTesting();
         TestRunner.testClass(BitmapTest.class);
         TestRunner.testClass(ColorTest.class);
+        TestRunner.testClass(ColorSpaceTest.class);
         TestRunner.testClass(DataTest.class);
         TestRunner.testClass(FontMgrTest.class);
         TestRunner.testClass(ImageTest.class);
@@ -24,6 +25,7 @@ public class TestSuite {
 
         TestRunner.testClass(SVGCanvasTest.class);
         TestRunner.testClass(StreamAssetTest.class);
+        TestRunner.testClass(RuntimeEffectBuilderTest.class);
 
         // TestRunner.testClass(TestTest.class);
         int res = TestRunner.finishTesting();

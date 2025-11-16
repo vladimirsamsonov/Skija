@@ -1,3 +1,90 @@
+# 0.143.3 - Nov 15, 2025
+
+Changed:
+
+- `Managed::close` does not throw now on non-managed or already closed objects
+
+Added:
+
+- `ColorSpace::makeFromICCProfile`
+
+# 0.143.2 - Nov 11, 2025
+
+Changed:
+
+- Re-enabled linux ARM build, thanks to @Eatgrapes #88
+
+# 0.143.0 - Nov 7, 2025
+
+Changed:
+
+- Skia version m132-9ab7c2064b -> m143-da51f0d60e
+- `Region::getBoundaryPath` now returns new Path instead of accepting one and modifying it
+- Most ImageFilter ctors now accept an optional cropRect
+- [ BREAKING ] `ShadowUtils::drawShadow` now accepts `ShadowUtilsFlag...`
+
+Added:
+
+- PathBuilder
+- Path.make*
+- Canvas::drawPathOnce (convenience, draws path and closes it immediately)
+- RuntimeEffect
+- RuntimeEffectBuilder
+- Image::makeWithFilter, makeScaled
+- ImageFilter::makeCrop, makeEmpty, makePicture, makeShader, makeBlend, makeRuntimeShader
+- Blender
+- Paint::getBlender, setBlender
+- Shader::isOpaque, getImage, makeWithLocalMatrix, makeWithWorkingColorSpace, makeFractalNoise, makeTurbulence
+- FontArguments
+- Typeface::makeClone(FontArguments)
+- FontCollection::defaultFallback(int, FontStyle, String, FontArguments)
+- Bitmap::setColorSpace
+- SaveLayerRec: FilterTileMode and ColorSpace
+- Codec::isAnimated
+
+Removed:
+
+- [ BREAKING ] Most of mutable methods on Path (moved to PathBuilder)
+
+# 0.132.0 - Oct 30, 2025
+
+Changed:
+
+- Skia version m123-f44dbc40d8 -> m132-9ab7c2064b
+- Updated build to support JDK 25
+
+Added:
+
+- `Shaper::makeBestAvailable`
+
+# 0.123.0 - Oct 28, 2025
+
+Changed:
+
+- Skia version m116-d2c211228d -> m123-f44dbc40d8
+- `DirectContext::submit` returns `boolean`
+
+Added:
+
+- `FontMgr::makeFromFile`
+- `DirectContext::flushAndSubmit`
+
+Removed:
+
+- [ BREAKING ] `Font::getTypefaceOrDefault`
+- [ BREAKING ] `Typeface::makeDefault`
+- [ BREAKING ] `Typeface::makeFromName` (use `FontMgr::matchFamilyStyle`)
+- [ BREAKING ] `Typeface::makeFromFile` (use `FontMgr::makeFromFile`)
+- [ BREAKING ] `Typeface::makeFromData` (use `FontMgr::makeFromData`)
+- [ BREAKING ] `Surface::flush` (use `DirectContext::flush(Surface)`)
+- [ BREAKING ] `Surface::flushAndSubmit` (use `DirectContext::flushAndSubmit(Surface)`)
+
+# 0.116.8 - Oct 11, 2025
+
+Fixed:
+
+- Prevent EXCEPTION_ACCESS_VIOLATION in Canvas.getSurface() method #86 via @vladimirsamsonov
+
 # 0.116.7 - Oct 2, 2025
 
 Fixed:

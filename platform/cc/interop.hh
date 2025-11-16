@@ -4,6 +4,7 @@
 #include <memory>
 #include <vector>
 #include "SkCodec.h"
+#include "SkFontArguments.h"
 #include "SkFontMetrics.h"
 #include "SkFontStyle.h"
 #include "SkImageInfo.h"
@@ -131,6 +132,18 @@ namespace skija {
         void onUnload(JNIEnv* env);
     }
 
+    namespace FontArguments {
+        extern jclass cls;
+        extern jfieldID collectionIndex;
+        extern jfieldID variations;
+        extern jfieldID paletteIndex;
+        extern jfieldID paletteOverrides;
+        void onLoad(JNIEnv* env);
+        void onUnload(JNIEnv* env);
+        SkFontArguments toSkFontArguments(JNIEnv* env, jobject fontArgumentsObj);
+        void freeSkFontArguments(SkFontArguments& args);
+    }
+
     namespace FontFeature {
         extern jclass cls;
         extern jmethodID ctor;
@@ -142,6 +155,14 @@ namespace skija {
         void onLoad(JNIEnv* env);
         void onUnload(JNIEnv* env);
         std::vector<SkShaper::Feature> fromJavaArray(JNIEnv* env, jobjectArray featuresArr);
+    }
+
+    namespace FontPaletteOverride {
+        extern jclass cls;
+        extern jfieldID index;
+        extern jfieldID color;
+        void onLoad(JNIEnv* env);
+        void onUnload(JNIEnv* env);
     }
 
     namespace FontMetrics {
@@ -179,12 +200,27 @@ namespace skija {
         void onUnload(JNIEnv* env);
     }
 
+    namespace Image {
+        extern jclass cls;
+        extern jmethodID ctor;
+        void onLoad(JNIEnv* env);
+        void onUnload(JNIEnv* env);
+    }
+
     namespace ImageInfo {
         extern jclass cls;
         extern jmethodID ctor;
         void onLoad(JNIEnv* env);
         void onUnload(JNIEnv* env);
         jobject toJava(JNIEnv* env, const SkImageInfo& imageInfo);
+    }
+
+    namespace ImageWithFilterResult {
+        extern jclass cls;
+        extern jmethodID ctor;
+        void onLoad(JNIEnv* env);
+        void onUnload(JNIEnv* env);
+        jobject make(JNIEnv* env, SkImage* image, const SkIRect& subset, const SkIPoint& offset);
     }
 
     namespace Path {
@@ -216,6 +252,20 @@ namespace skija {
     }
 
     namespace RSXform {
+        extern jclass cls;
+        extern jmethodID ctor;
+        void onLoad(JNIEnv* env);
+        void onUnload(JNIEnv* env);
+    }
+
+    namespace RuntimeEffectUniformInfo {
+        extern jclass cls;
+        extern jmethodID ctor;
+        void onLoad(JNIEnv* env);
+        void onUnload(JNIEnv* env);
+    }
+
+    namespace RuntimeEffectChildInfo {
         extern jclass cls;
         extern jmethodID ctor;
         void onLoad(JNIEnv* env);
@@ -296,7 +346,7 @@ namespace types {
         void onUnload(JNIEnv* env);
         jobject make(JNIEnv* env, float x, float y);
         jobject fromSkPoint(JNIEnv* env, const SkPoint& p);
-        jobjectArray fromSkPoints(JNIEnv* env, const std::vector<SkPoint>& ps);
+        jobjectArray fromSkPoints(JNIEnv* env, SkSpan<const SkPoint> ps);
     }
 
     namespace Rect {
@@ -342,17 +392,58 @@ SkString skString(JNIEnv* env, jstring str);
 jstring javaString(JNIEnv* env, const SkString& str);
 jstring javaString(JNIEnv* env, const char* chars, size_t len);
 jstring javaString(JNIEnv* env, const char* chars);
+jstring javaString(JNIEnv* env, const std::string& str);
+jstring javaString(JNIEnv* env, std::string_view str);
 
 jobject javaFloat(JNIEnv* env, SkScalar val);
 jlong packTwoInts(int32_t a, int32_t b);
 jlong packIPoint(SkIPoint p);
 jlong packISize(SkISize s);
 
-jbyteArray   javaByteArray  (JNIEnv* env, const std::vector<jbyte>& bytes);
-jshortArray  javaShortArray (JNIEnv* env, const std::vector<jshort>& shorts);
-jintArray    javaIntArray   (JNIEnv* env, const std::vector<jint>& ints);
-jlongArray   javaLongArray  (JNIEnv* env, const std::vector<jlong>& longs);
-jfloatArray  javaFloatArray (JNIEnv* env, const std::vector<float>& floats);
+template <typename T>
+jbyteArray javaByteArray(JNIEnv* env, const std::vector<T>& bytes) {
+    jbyteArray res = env->NewByteArray((jsize) bytes.size());
+    env->SetByteArrayRegion(res, 0, (jsize) bytes.size(), bytes.data());
+    return res;
+}
+
+template <typename T>
+jshortArray javaShortArray(JNIEnv* env, const std::vector<T>& shorts) {
+    jshortArray res = env->NewShortArray((jsize) shorts.size());
+    env->SetShortArrayRegion(res, 0, (jsize) shorts.size(), reinterpret_cast<const jshort*>(shorts.data()));
+    return res;
+}
+
+template <typename T>
+jintArray javaIntArray(JNIEnv* env, const std::vector<T>& ints) {
+    jintArray res = env->NewIntArray((jsize) ints.size());
+    env->SetIntArrayRegion(res, 0, (jsize) ints.size(), reinterpret_cast<const jint*>(ints.data()));
+    return res;
+}
+
+template <typename T>
+jlongArray javaLongArray(JNIEnv* env, const std::vector<T>& longs) {
+    jlongArray res = env->NewLongArray((jsize) longs.size());
+    env->SetLongArrayRegion(res, 0, (jsize) longs.size(), longs.data());
+    return res;
+}
+
+template <typename T>
+jfloatArray javaFloatArray(JNIEnv* env, SkSpan<const T> floats) {
+    jfloatArray res = env->NewFloatArray((jsize) floats.size());
+    env->SetFloatArrayRegion(res, 0, (jsize) floats.size(), floats.data());
+    return res;
+}
+
+template <typename T>
+jfloatArray javaFloatArray(JNIEnv* env, const std::vector<T>& floats) {
+    return javaFloatArray(env, SkSpan(floats.data(), floats.size()));
+}
+
+template <typename T>
+jfloatArray javaFloatArray(JNIEnv* env, std::initializer_list<T> floats) {
+    return javaFloatArray(env, SkSpan(floats.begin(), floats.size()));
+}
 
 std::vector<SkString> skStringVector(JNIEnv* env, jobjectArray arr);
 jobjectArray javaStringArray(JNIEnv* env, const std::vector<SkString>& strings);

@@ -30,23 +30,188 @@ public class Path extends Managed implements Iterable<PathSegment> {
     public static class _FinalizerHolder {
         public static final long PTR = _nGetFinalizer();
     }
-    
-    /**
-     * Constructs an empty Path. By default, Path has no verbs, no {@link Point}, and no weights.
-     * FillMode is set to {@link PathFillMode#WINDING}.
-     */
-    public Path() {
-        this(_nMake());
-        Stats.onNativeCall();
+
+    @NotNull @Contract("_, _, _, _ -> new")
+    public static Path makeRaw(@NotNull Point[] points, @NotNull PathVerb[] verbs, @NotNull float[] conicWeights, @NotNull PathFillMode fillMode) {
+        return makeRaw(points, verbs, conicWeights, fillMode, false);
     }
 
-    @NotNull
-    public static Path makeFromSVGString(String svg) {
+    @NotNull @Contract("_, _, _, _, _ -> new")
+    public static Path makeRaw(@NotNull Point[] points, @NotNull PathVerb[] verbs, @NotNull float[] conicWeights, @NotNull PathFillMode fillMode, boolean isVolatile) {
+        Stats.onNativeCall();
+        int[] verbOrdinals = new int[verbs.length];
+        for (int i = 0; i < verbs.length; i++) {
+            verbOrdinals[i] = verbs[i].ordinal();
+        }
+        float[] coords = new float[points.length * 2];
+        for (int i = 0; i < points.length; i++) {
+            coords[i * 2] = points[i]._x;
+            coords[i * 2 + 1] = points[i]._y;
+        }
+        return new Path(_nMakeRaw(coords, verbOrdinals, conicWeights, fillMode.ordinal(), isVolatile));
+    }
+
+    @NotNull @Contract("_ -> new")
+    public static Path makeRect(@NotNull Rect rect) {
+        return makeRect(rect, PathDirection.CLOCKWISE, 0);
+    }
+
+    @NotNull @Contract("_, _ -> new")
+    public static Path makeRect(@NotNull Rect rect, @NotNull PathDirection dir) {
+        return makeRect(rect, dir, 0);
+    }
+
+    @NotNull @Contract("_, _, _ -> new")
+    public static Path makeRect(@NotNull Rect rect, @NotNull PathDirection dir, int startIndex) {
+        Stats.onNativeCall();
+        return new Path(_nMakeRect(rect._left, rect._top, rect._right, rect._bottom, dir.ordinal(), startIndex));
+    }
+
+    @NotNull @Contract("_ -> new")
+    public static Path makeOval(@NotNull Rect oval) {
+        return makeOval(oval, PathDirection.CLOCKWISE);
+    }
+
+    @NotNull @Contract("_, _ -> new")
+    public static Path makeOval(@NotNull Rect oval, @NotNull PathDirection dir) {
+        Stats.onNativeCall();
+        return new Path(_nMakeOval(oval._left, oval._top, oval._right, oval._bottom, dir.ordinal()));
+    }
+
+    @NotNull @Contract("_, _, _ -> new")
+    public static Path makeCircle(float x, float y, float radius) {
+        return makeCircle(x, y, radius, PathDirection.CLOCKWISE);
+    }
+
+    @NotNull @Contract("_, _, _, _ -> new")
+    public static Path makeCircle(float x, float y, float radius, @NotNull PathDirection dir) {
+        Stats.onNativeCall();
+        return new Path(_nMakeCircle(x, y, radius, dir.ordinal()));
+    }
+
+    @NotNull @Contract("_ -> new")
+    public static Path makeRRect(@NotNull RRect rrect) {
+        return makeRRect(rrect, PathDirection.CLOCKWISE, 0);
+    }
+
+    @NotNull @Contract("_, _ -> new")
+    public static Path makeRRect(@NotNull RRect rrect, @NotNull PathDirection dir) {
+        return makeRRect(rrect, dir, 0);
+    }
+
+    @NotNull @Contract("_, _, _ -> new")
+    public static Path makeRRect(@NotNull RRect rrect, @NotNull PathDirection dir, int startIndex) {
+        try {
+            Stats.onNativeCall();
+            return new Path(_nMakeRRect(rrect._left, rrect._top, rrect._right, rrect._bottom,
+                                        rrect._radii, dir.ordinal(), startIndex));
+        } finally {
+            ReferenceUtil.reachabilityFence(rrect);
+        }
+    }
+
+    @NotNull @Contract("_, _ -> new")
+    public static Path makePolygon(@NotNull Point[] pts, boolean isClosed) {
+        return makePolygon(pts, isClosed, PathFillMode.WINDING, false);
+    }
+
+    @NotNull @Contract("_, _, _ -> new")
+    public static Path makePolygon(@NotNull Point[] pts, boolean isClosed, @NotNull PathFillMode fillMode) {
+        return makePolygon(pts, isClosed, fillMode, false);
+    }
+
+    @NotNull @Contract("_, _, _, _ -> new")
+    public static Path makePolygon(@NotNull Point[] pts, boolean isClosed, @NotNull PathFillMode fillMode, boolean isVolatile) {
+        Stats.onNativeCall();
+        float[] coords = new float[pts.length * 2];
+        for (int i = 0; i < pts.length; i++) {
+            coords[i * 2] = pts[i]._x;
+            coords[i * 2 + 1] = pts[i]._y;
+        }
+        return new Path(_nMakePolygon(coords, isClosed, fillMode.ordinal(), isVolatile));
+    }
+
+    @NotNull @Contract("_, _ -> new")
+    public static Path makeLine(@NotNull Point a, @NotNull Point b) {
+        return makeLine(a._x, a._y, b._x, b._y);
+    }
+
+    @NotNull @Contract("_, _, _, _ -> new")
+    public static Path makeLine(float x0, float y0, float x1, float y1) {
+        Stats.onNativeCall();
+        return new Path(_nMakeLine(x0, y0, x1, y1));
+    }
+
+    @NotNull @Contract("_ -> new")
+    public static Path makeFromSVGString(@NotNull String svg) {
+        Stats.onNativeCall();
         long res = _nMakeFromSVGString(svg);
         if (res == 0)
             throw new IllegalArgumentException("Failed to parse SVG Path string: " + svg);
         else
             return new Path(res);
+    }
+
+    /**
+     * <p>Returns Path that is the result of applying the Op to the first path and the second path.
+     * <p>The resulting path will be constructed from non-overlapping contours.
+     * <p>The curve order is reduced where possible so that cubics may be turned
+     * into quadratics, and quadratics maybe turned into lines.
+     *
+     * @param one The first operand (for difference, the minuend)
+     * @param two The second operand (for difference, the subtrahend)
+     * @param op  The operator to apply.
+     * @return    Path if operation was able to produce a result, null otherwise
+     */
+    @Nullable @Contract("_, _, _ -> new")
+    public static Path makeCombining(@NotNull Path one, @NotNull Path two, @NotNull PathOp op) {
+        try {
+            Stats.onNativeCall();
+            long ptr = _nMakeCombining(Native.getPtr(one), Native.getPtr(two), op.ordinal());
+            return ptr == 0 ? null : new Path(ptr);
+        } finally {
+            ReferenceUtil.reachabilityFence(one);
+            ReferenceUtil.reachabilityFence(two);
+        }
+    }
+
+    /**
+     * Constructs an empty Path. By default, Path has no verbs, no {@link Point}, and no weights.
+     * FillMode is set to {@link PathFillMode#WINDING}.
+     *
+     * @see <a href="https://fiddle.skia.org/c/@Path_empty_constructor">https://fiddle.skia.org/c/@Path_empty_constructor</a>
+     */
+    public Path() {
+        this(_nMake(PathFillMode.WINDING.ordinal()));
+        Stats.onNativeCall();
+    }
+
+    /**
+     * Constructs an empty {@link Path} with specified {@link PathFillMode}.
+     * By default, {@link Path} has no verbs, no {@link Point}, and no weights.
+     */
+    public Path(@NotNull PathFillMode fillMode) {
+        this(_nMake(fillMode.ordinal()));
+        Stats.onNativeCall();
+    }
+
+    /**
+     * <p>Constructs a copy of an existing path. Copy constructor makes two
+     * paths identical by value. Internally, path and the returned result share
+     * pointer values. The underlying verb array, {@link Point} array and
+     * weights are copied when modified.</p>
+     *
+     * <p>Creating a {@link Path} copy is very efficient and never allocates
+     * memory. {@link Path} are always copied by value from the interface; the
+     * underlying shared pointers are not exposed.</p>
+     *
+     * @param path  Path to copy by value
+     * @see <a href="https://fiddle.skia.org/c/@Path_copy_const_SkPath">https://fiddle.skia.org/c/@Path_copy_const_SkPath</a>
+     */
+    public Path(@NotNull Path path) {
+        this(_nMakeCopy(Native.getPtr(path)));
+        ReferenceUtil.reachabilityFence(path);
+        Stats.onNativeCall();
     }
 
     /**
@@ -57,7 +222,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      * @return   true if this and Path are equivalent
     */
     @ApiStatus.Internal @Override
-    public boolean _nativeEquals(Native other) {
+    public boolean _nativeEquals(@NotNull Native other) {
         try {
             return _nEquals(_ptr, Native.getPtr(other));
         } finally {
@@ -70,16 +235,17 @@ public class Path extends Managed implements Iterable<PathSegment> {
      * <p>Returns true if Path contain equal verbs and equal weights.
      * If Path contain one or more conics, the weights must match.</p>
      *
-     * <p>{@link #conicTo(float, float, float, float, float)} may add different verbs
+     * <p>{@link PathBuilder#conicTo(float, float, float, float, float)} may add different verbs
      * depending on conic weight, so it is not trivial to interpolate a pair of Path
      * containing conics with different conic weight values.</p>
      *
      * @param compare  Path to compare
      * @return         true if Path verb array and weights are equivalent
-     * 
+     *
      * @see <a href="https://fiddle.skia.org/c/@Path_isInterpolatable">https://fiddle.skia.org/c/@Path_isInterpolatable</a>
      */
-    public boolean isInterpolatable(Path compare) {
+    @Contract(pure = true)
+    public boolean isInterpolatable(@NotNull Path compare) {
         try {
             Stats.onNativeCall();
             return _nIsInterpolatable(_ptr, Native.getPtr(compare));
@@ -89,7 +255,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
         }
     }
 
-    /** 
+    /**
      * <p>Interpolates between Path with {@link Point} array of equal size.
      * Copy verb array and weights to out, and set out Point array to a weighted
      * average of this Point array and ending Point array, using the formula:
@@ -111,10 +277,11 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_interpolate">https://fiddle.skia.org/c/@Path_interpolate</a>
      */
-    public Path makeLerp(Path ending, float weight) {
+    @NotNull @Contract("_, _ -> new")
+    public Path makeInterpolate(@NotNull Path ending, float weight) {
         try {
             Stats.onNativeCall();
-            long ptr = _nMakeLerp(_ptr, Native.getPtr(ending), weight);
+            long ptr = _nMakeInterpolate(_ptr, Native.getPtr(ending), weight);
             if (ptr == 0)
                 throw new IllegalArgumentException("Point array is not the same size as ending Point array");
             return new Path(ptr);
@@ -124,6 +291,12 @@ public class Path extends Managed implements Iterable<PathSegment> {
         }
     }
 
+    /**
+     * Returns {@link PathFillMode}, the rule used to fill {@link Path}.
+     *
+     * @return  current {@link PathFillMode} setting
+     */
+    @NotNull @Contract(pure = true)
     public PathFillMode getFillMode() {
         try {
             Stats.onNativeCall();
@@ -133,10 +306,55 @@ public class Path extends Managed implements Iterable<PathSegment> {
         }
     }
 
-    public Path setFillMode(PathFillMode fillMode) {
-        Stats.onNativeCall();
-        _nSetFillMode(_ptr, fillMode.ordinal());
-        return this;
+    /**
+     * Creates an {@link Path} with the same properties and data, and with
+     * {@link PathFillMode} set to fillMode.
+     *
+     * @return  new {@link Path}
+     */
+    @NotNull @Contract("_ -> new")
+    public Path makeWithFillMode(@NotNull PathFillMode fillMode) {
+        try {
+            Stats.onNativeCall();
+            return new Path(_nMakeWithFillMode(_ptr, fillMode.ordinal()));
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
+    }
+
+   /**
+    * Returns if {@link PathFillMode} describes area outside {@link Path}
+    * geometry. The inverse fill area extends indefinitely.
+    *
+    * @return  true if {@link PathFillMode} is {@link PathFillMode#INVERSE_WINDING}
+    *          or {@link PathFillMode#INVERSE_EVEN_ODD}
+    */
+    @Contract(pure = true)
+    public boolean isInverseFillType() {
+        try {
+            Stats.onNativeCall();
+            return _nIsInverseFillType(_ptr);
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
+    }
+
+    /**
+     * Creates an {@link Path} with the same properties and data, and with
+     * {@link PathFillMode} replaced with its inverse. The inverse of
+     * {@link PathFillMode} describes the area unmodified by the original
+     * {@link PathFillMode}.
+     *
+     * @return  new {@link Path}
+     */
+    @NotNull @Contract("-> new")
+    public Path makeToggleInverseFillType() {
+        try {
+            Stats.onNativeCall();
+            return new Path(_nMakeToggleInverseFillType(_ptr));
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
     }
 
     /**
@@ -144,6 +362,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  true or false
      */
+    @Contract(pure = true)
     public boolean isConvex() {
         try {
             Stats.onNativeCall();
@@ -155,11 +374,12 @@ public class Path extends Managed implements Iterable<PathSegment> {
 
     /**
      * Returns oval bounds if this path is recognized as an oval or circle.
-     * 
+     *
      * @return  bounds is recognized as an oval or circle, null otherwise
-     * 
+     *
      * @see <a href="https://fiddle.skia.org/c/@Path_isOval">https://fiddle.skia.org/c/@Path_isOval</a>
      */
+    @Nullable @Contract(pure = true)
     public Rect isOval() {
         try {
             Stats.onNativeCall();
@@ -171,11 +391,12 @@ public class Path extends Managed implements Iterable<PathSegment> {
 
     /**
      * Returns {@link RRect} if this path is recognized as an oval, circle or RRect.
-     * 
+     *
      * @return  bounds is recognized as an oval, circle or RRect, null otherwise
-     * 
+     *
      * @see <a href="https://fiddle.skia.org/c/@Path_isRRect">https://fiddle.skia.org/c/@Path_isRRect</a>
      */
+    @Nullable @Contract(pure = true)
     public RRect isRRect() {
         try {
             Stats.onNativeCall();
@@ -185,48 +406,16 @@ public class Path extends Managed implements Iterable<PathSegment> {
         }
     }
 
-    /**
-     * <p>Sets Path to its initial state.</p>
-     * 
-     * <p>Removes verb array, Point array, and weights, and sets FillMode to {@link PathFillMode#WINDING}.
-     * Internal storage associated with Path is released.</p>
-     *
-     * @return  this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_reset">https://fiddle.skia.org/c/@Path_reset</a>
-     */
-    public Path reset() {
-        Stats.onNativeCall();
-        _nReset(_ptr);
-        return this;
-    }
-
-    /**
-     * <p>Sets Path to its initial state, preserving internal storage.
-     * Removes verb array, Point array, and weights, and sets FillMode to kWinding.
-     * Internal storage associated with Path is retained.</p>
-     *
-     * <p>Use {@link #rewind()} instead of {@link #reset()} if Path storage will be reused and performance
-     * is critical.</p>
-     *
-     * @return  this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_rewind">https://fiddle.skia.org/c/@Path_rewind</a>
-     */
-    public Path rewind() {
-        Stats.onNativeCall();
-        _nRewind(_ptr);
-        return this;
-    }
 
     /**
      * <p>Returns if Path is empty.</p>
-     * 
+     *
      * <p>Empty Path may have FillMode but has no {@link Point}, {@link PathVerb}, or conic weight.
-     * {@link Path()} constructs empty Path; {@link #reset()} and {@link #rewind()} make Path empty.</p>
+     * {@link Path()} constructs empty Path; {@link #reset()} make Path empty.</p>
      *
      * @return  true if the path contains no Verb array
      */
+    @Contract(pure = true)
     public boolean isEmpty() {
         try {
             Stats.onNativeCall();
@@ -238,14 +427,15 @@ public class Path extends Managed implements Iterable<PathSegment> {
 
     /**
      * <p>Returns if contour is closed.</p>
-     * 
-     * <p>Contour is closed if Path Verb array was last modified by {@link #closePath()}. When stroked,
+     *
+     * <p>Contour is closed if Path Verb array was last modified by {@link PathBuilder#closePath()}. When stroked,
      * closed contour draws {@link PaintStrokeJoin} instead of {@link PaintStrokeCap} at first and last Point.</p>
      *
      * @return  true if the last contour ends with a {@link PathVerb#CLOSE}
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_isLastContourClosed">https://fiddle.skia.org/c/@Path_isLastContourClosed</a>
      */
+    @Contract(pure = true)
     public boolean isLastContourClosed() {
         try {
             Stats.onNativeCall();
@@ -262,6 +452,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  true if all Point values are finite
      */
+    @Contract(pure = true)
     public boolean isFinite() {
         try {
             Stats.onNativeCall();
@@ -279,6 +470,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  true if caller will alter Path after drawing
      */
+    @Contract(pure = true)
     public boolean isVolatile() {
         try {
             Stats.onNativeCall();
@@ -289,31 +481,37 @@ public class Path extends Managed implements Iterable<PathSegment> {
     }
 
     /**
-     * <p>Specifies whether Path is volatile; whether it will be altered or discarded
-     * by the caller after it is drawn. Path by default have volatile set false, allowing
-     * SkBaseDevice to attach a cache of data which speeds repeated drawing.</p>
+     * <p>Return a copy of {@link Path} with isVolatile indicating whether it
+     * will be altered or discarded by the caller after it is drawn. {@link Path}
+     * by default have volatile set false, allowing Skia to attach a cache of
+     * data which speeds repeated drawing.</p>
      *
      * <p>Mark temporary paths, discarded or modified after use, as volatile
-     * to inform SkBaseDevice that the path need not be cached.</p>
+     * to inform Skia that the path need not be cached.</p>
      *
-     * <p>Mark animating Path volatile to improve performance.
-     * Mark unchanging Path non-volatile to improve repeated rendering.</p>
+     * <p>Mark animating {@link Path} volatile to improve performance. Mark
+     * unchanging {@link Path} non-volatile to improve repeated rendering.</p>
      *
-     * <p>raster surface Path draws are affected by volatile for some shadows.
-     * GPU surface Path draws are affected by volatile for some shadows and concave geometries.</p>
+     * <p>raster surface {@link Path} draws are affected by volatile for some
+     * shadows. GPU surface {@link Path} draws are affected by volatile for some
+     * shadows and concave geometries.</p>
      *
-     * @param isVolatile  true if caller will alter Path after drawing
-     * @return            this
+     * @param isVolatile  true if caller will alter {@link Path} after drawing
+     * @return            new {@link Path}
      */
-    public Path setVolatile(boolean isVolatile) {
-        Stats.onNativeCall();
-        _nSetVolatile(_ptr, isVolatile);
-        return this;
+    @NotNull @Contract("_ -> new")
+    public Path makeWithVolatile(boolean isVolatile) {
+        try {
+            Stats.onNativeCall();
+            return new Path(_nMakeWithVolatile(_ptr, isVolatile));
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
     }
 
     /**
      * <p>Tests if line between Point pair is degenerate.</p>
-     * 
+     *
      * <p>Line with no length or that moves a very short distance is degenerate; it is
      * treated as a point.</p>
      *
@@ -327,7 +525,8 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_IsLineDegenerate">https://fiddle.skia.org/c/@Path_IsLineDegenerate</a>
      */
-    public static boolean isLineDegenerate(Point p1, Point p2, boolean exact) {
+    @Contract(pure = true)
+    public static boolean isLineDegenerate(@NotNull Point p1, @NotNull Point p2, boolean exact) {
         Stats.onNativeCall();
         return _nIsLineDegenerate(p1._x, p1._y, p2._x, p2._y, exact);
     }
@@ -345,14 +544,15 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *               if false, returns true if p1, p2, and p3 are equal or nearly equal
      * @return       true if quad is degenerate; its length is effectively zero
      */
-    public static boolean isQuadDegenerate(Point p1, Point p2, Point p3, boolean exact) {
+    @Contract(pure = true)
+    public static boolean isQuadDegenerate(@NotNull Point p1, @NotNull Point p2, @NotNull Point p3, boolean exact) {
         Stats.onNativeCall();
         return _nIsQuadDegenerate(p1._x, p1._y, p2._x, p2._y, p3._x, p3._y, exact);
     }
 
     /**
      * <p>Tests if cubic is degenerate.</p>
-     * 
+     *
      * <p>Cubic with no length or that moves a very short distance is degenerate; it is
      * treated as a point.</p>
      *
@@ -364,7 +564,8 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *               if false, returns true if p1, p2, p3, and p4 are equal or nearly equal
      * @return       true if cubic is degenerate; its length is effectively zero
      */
-    public static boolean isCubicDegenerate(Point p1, Point p2, Point p3, Point p4, boolean exact) {
+    @Contract(pure = true)
+    public static boolean isCubicDegenerate(@NotNull Point p1, @NotNull Point p2, @NotNull Point p3, @NotNull Point p4, boolean exact) {
         Stats.onNativeCall();
         return _nIsCubicDegenerate(p1._x, p1._y, p2._x, p2._y, p3._x, p3._y, p4._x, p4._y, exact);
     }
@@ -378,10 +579,61 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_isLine">https://fiddle.skia.org/c/@Path_isLine</a>
      */
+    @Nullable @Contract(pure = true)
     public Point[] getAsLine() {
         try {
             Stats.onNativeCall();
             return _nMaybeGetAsLine(_ptr);
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
+    }
+
+    /**
+     * Return a read-only view into the path's points.
+     *
+     * @return  array of {@link Point}s
+     */
+    @NotNull @Contract(pure = true)
+    public Point[] getPoints() {
+        try {
+            Stats.onNativeCall();
+            return _nGetPoints(_ptr);
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
+    }
+
+    /**
+     * Return a read-only view into the path's verbs.
+     *
+     * @return  array of {@link PathVerb}s
+     */
+    @NotNull @Contract(pure = true)
+    public PathVerb[] getVerbs() {
+        try {
+            Stats.onNativeCall();
+            int[] verbOrdinals = _nGetVerbs(_ptr);
+            PathVerb[] verbs = new PathVerb[verbOrdinals.length];
+            for (int i = 0; i < verbOrdinals.length; i++) {
+                verbs[i] = PathVerb._values[verbOrdinals[i]];
+            }
+            return verbs;
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
+    }
+
+    /**
+     * Return a read-only view into the path's conic-weights.
+     *
+     * @return  array of conic weights.
+     */
+    @NotNull @Contract(pure = true)
+    public float[] getConicWeights() {
+        try {
+            Stats.onNativeCall();
+            return _nGetConicWeights(_ptr);
         } finally {
             ReferenceUtil.reachabilityFence(this);
         }
@@ -395,65 +647,11 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_countPoints">https://fiddle.skia.org/c/@Path_countPoints</a>
      */
+    @Contract(pure = true)
     public int getPointsCount() {
         try {
             Stats.onNativeCall();
             return _nGetPointsCount(_ptr);
-        } finally {
-            ReferenceUtil.reachabilityFence(this);
-        }
-    }
-
-    /**
-     * <p>Returns Point at index in Point array. Valid range for index is
-     * 0 to countPoints() - 1.</p>
-     *
-     * <p>Returns (0, 0) if index is out of range.</p>
-     *
-     * @param index  Point array element selector
-     * @return       Point array value or (0, 0)
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_getPoint">https://fiddle.skia.org/c/@Path_getPoint</a>
-     */
-    public Point getPoint(int index) {
-        try {
-            Stats.onNativeCall();
-            return _nGetPoint(_ptr, index);
-        } finally {
-            ReferenceUtil.reachabilityFence(this);
-        }
-    }
-
-    /**
-     * <p>Returns all points in Path.</p>
-     *
-     * @return        Path Point array length
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_getPoints">https://fiddle.skia.org/c/@Path_getPoints</a>
-     */
-    public Point[] getPoints() {
-        Point[] res = new Point[getPointsCount()];
-        getPoints(res, res.length);
-        return res;
-    }
-
-    /**
-     * <p>Returns number of points in Path. Up to max points are copied.</p>
-     * 
-     * <p>points may be null; then, max must be zero.
-     * If max is greater than number of points, excess points storage is unaltered.</p>
-     *
-     * @param points  storage for Path Point array. May be null
-     * @param max     maximum to copy; must be greater than or equal to zero
-     * @return        Path Point array length
-     * 
-     * @see <a href="https://fiddle.skia.org/c/@Path_getPoints">https://fiddle.skia.org/c/@Path_getPoints</a>
-     */
-    public int getPoints(Point[] points, int max) {
-        try {
-            assert points == null ? max == 0 : true;
-            Stats.onNativeCall();
-            return _nGetPoints(_ptr, points, max);
         } finally {
             ReferenceUtil.reachabilityFence(this);
         }
@@ -467,6 +665,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_countVerbs">https://fiddle.skia.org/c/@Path_countVerbs</a>
      */
+    @Contract(pure = true)
     public int getVerbsCount() {
         try {
             Stats.onNativeCall();
@@ -476,31 +675,18 @@ public class Path extends Managed implements Iterable<PathSegment> {
         }
     }
 
-    public PathVerb[] getVerbs() {
-        PathVerb[] res = new PathVerb[getVerbsCount()];
-        getVerbs(res, res.length);
-        return res;
-    }
-
     /**
-     * Returns the number of verbs in the path. Up to max verbs are copied.
+     * Return the last point, or null.
      *
-     * @param verbs  storage for verbs, may be null
-     * @param max    maximum number to copy into verbs
-     * @return       the actual number of verbs in the path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_getVerbs">https://fiddle.skia.org/c/@Path_getVerbs</a>
+     * @return  The last if the path contains one or more {@link Point}, else
+     *          returns null
+     * @see     <a href="https://fiddle.skia.org/c/@Path_getLastPt">https://fiddle.skia.org/c/@Path_getLastPt</a>
      */
-    public int getVerbs(PathVerb[] verbs, int max) {
+    @Nullable @Contract(pure = true)
+    public Point getLastPt() {
         try {
-            assert verbs == null ? max == 0 : true;
             Stats.onNativeCall();
-            byte[] out = verbs == null ? null : new byte[max];
-            int count = _nGetVerbs(_ptr, out, max);
-            if (verbs != null)
-                for (int i = 0; i < Math.min(count, max); ++i)
-                    verbs[i] = PathVerb._values[out[i]];
-            return count;
+            return _nGetLastPt(_ptr);
         } finally {
             ReferenceUtil.reachabilityFence(this);
         }
@@ -511,6 +697,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  approximate size
      */
+    @Contract(pure = true)
     public long getApproximateBytesUsed() {
         try {
             Stats.onNativeCall();
@@ -521,28 +708,8 @@ public class Path extends Managed implements Iterable<PathSegment> {
     }
 
     /**
-     * <p>Exchanges the verb array, Point array, weights, and FillMode with other.
-     * Cached state is also exchanged. swap() internally exchanges pointers, so
-     * it is lightweight and does not allocate memory.</p>
-     *
-     * @param   other  Path exchanged by value
-     * @return  this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_swap">https://fiddle.skia.org/c/@Path_swap</a>
-     */
-    public Path swap(Path other) {
-        try {
-            Stats.onNativeCall();
-            _nSwap(_ptr, Native.getPtr(other));
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(other);
-        }
-    }
-
-    /** 
      * <p>Returns minimum and maximum axes values of Point array.</p>
-     * 
+     *
      * <p>Returns (0, 0, 0, 0) if Path contains no points. Returned bounds width and height may
      * be larger or smaller than area affected when Path is drawn.</p>
      *
@@ -551,6 +718,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  bounds of all Point in Point array
      */
+    @NotNull @Contract(pure = true)
     public Rect getBounds() {
         try {
             Stats.onNativeCall();
@@ -571,6 +739,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  this
      */
+    @NotNull @Contract("-> this")
     public Path updateBoundsCache() {
         Stats.onNativeCall();
         _nUpdateBoundsCache(_ptr);
@@ -595,6 +764,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_computeTightBounds">https://fiddle.skia.org/c/@Path_computeTightBounds</a>
      */
+    @NotNull @Contract(pure = true)
     public Rect computeTightBounds() {
         try {
             Stats.onNativeCall();
@@ -618,7 +788,8 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_conservativelyContainsRect">https://fiddle.skia.org/c/@Path_conservativelyContainsRect</a>
      */
-    public boolean conservativelyContainsRect(Rect rect) {
+    @Contract(pure = true)
+    public boolean conservativelyContainsRect(@NotNull Rect rect) {
         try {
             Stats.onNativeCall();
             return _nConservativelyContainsRect(_ptr, rect._left, rect._top, rect._right, rect._bottom);
@@ -628,553 +799,9 @@ public class Path extends Managed implements Iterable<PathSegment> {
     }
 
     /**
-     * <p>Grows Path verb array and Point array to contain extraPtCount additional Point.
-     * May improve performance and use less memory by
-     * reducing the number and size of allocations when creating Path.</p>
-     *
-     * @param extraPtCount  number of additional Point to allocate
-     * @return              this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_incReserve">https://fiddle.skia.org/c/@Path_incReserve</a>
-     */
-    public Path incReserve(int extraPtCount) {
-        Stats.onNativeCall();
-        _nIncReserve(_ptr, extraPtCount);
-        return this;
-    }
-
-    /**
-     * Adds beginning of contour at Point (x, y).
-     *
-     * @param x  x-axis value of contour start
-     * @param y  y-axis value of contour start
-     * @return   reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_moveTo">https://fiddle.skia.org/c/@Path_moveTo</a>
-     */
-    public Path moveTo(float x, float y) {
-        Stats.onNativeCall();
-        _nMoveTo(_ptr, x, y);
-        return this;
-    }
-
-    /**
-     * Adds beginning of contour at Point p.
-     *
-     * @param p  contour start
-     * @return   this
-     */
-    public Path moveTo(Point p) {
-        return moveTo(p._x, p._y);
-    }
-
-    /**
-     * <p>Adds beginning of contour relative to last point.</p>
-     *
-     * <p>If Path is empty, starts contour at (dx, dy).
-     * Otherwise, start contour at last point offset by (dx, dy).
-     * Function name stands for "relative move to".</p>
-     *
-     * @param dx  offset from last point to contour start on x-axis
-     * @param dy  offset from last point to contour start on y-axis
-     * @return    reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_rMoveTo">https://fiddle.skia.org/c/@Path_rMoveTo</a>
-     */
-    public Path rMoveTo(float dx, float dy) {
-        Stats.onNativeCall();
-        _nRMoveTo(_ptr, dx, dy);
-        return this;
-    }
-
-    /**
-     * <p>Adds line from last point to (x, y). If Path is empty, or last Verb is
-     * {@link PathVerb#CLOSE}, last point is set to (0, 0) before adding line.</p>
-     *
-     * <p>lineTo() appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed.
-     * lineTo() then appends {@link PathVerb#LINE} to verb array and (x, y) to Point array.</p>
-     *
-     * @param x  end of added line on x-axis
-     * @param y  end of added line on y-axis
-     * @return   this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_lineTo">https://fiddle.skia.org/c/@Path_lineTo</a>
-     */
-    public Path lineTo(float x, float y) {
-        Stats.onNativeCall();
-        _nLineTo(_ptr, x, y);
-        return this;
-    }
-
-    /**
-     * <p>Adds line from last point to Point p. If Path is empty, or last {@link PathVerb} is
-     * {@link PathVerb#CLOSE}, last point is set to (0, 0) before adding line.</p>
-     *
-     * <p>lineTo() first appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed.
-     * lineTo() then appends {@link PathVerb#LINE} to verb array and Point p to Point array.</p>
-     *
-     * @param p  end Point of added line
-     * @return   reference to Path
-     */
-    public Path lineTo(Point p) {
-        return lineTo(p._x, p._y);
-    }
-
-    /**
-     * <p>Adds line from last point to vector (dx, dy). If Path is empty, or last {@link PathVerb} is
-     * {@link PathVerb#CLOSE}, last point is set to (0, 0) before adding line.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed;
-     * then appends {@link PathVerb#LINE} to verb array and line end to Point array.</p>
-     *
-     * <p>Line end is last point plus vector (dx, dy).</p>
-     * 
-     * <p>Function name stands for "relative line to".</p>
-     *
-     * @param dx  offset from last point to line end on x-axis
-     * @param dy  offset from last point to line end on y-axis
-     * @return    reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_rLineTo">https://fiddle.skia.org/c/@Path_rLineTo</a>
-     * @see <a href="https://fiddle.skia.org/c/@Quad_a">https://fiddle.skia.org/c/@Quad_a</a>
-     * @see <a href="https://fiddle.skia.org/c/@Quad_b">https://fiddle.skia.org/c/@Quad_b</a>
-     */
-    public Path rLineTo(float dx, float dy) {
-        Stats.onNativeCall();
-        _nRLineTo(_ptr, dx, dy);
-        return this;
-    }
-
-    /**
-     * Adds quad from last point towards (x1, y1), to (x2, y2).
-     * If Path is empty, or last {@link PathVerb} is {@link PathVerb#CLOSE}, last point is set to (0, 0)
-     * before adding quad.
-     *
-     * Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed;
-     * then appends {@link PathVerb#QUAD} to verb array; and (x1, y1), (x2, y2)
-     * to Point array.
-     *
-     * @param x1  control Point of quad on x-axis
-     * @param y1  control Point of quad on y-axis
-     * @param x2  end Point of quad on x-axis
-     * @param y2  end Point of quad on y-axis
-     * @return    reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_quadTo">https://fiddle.skia.org/c/@Path_quadTo</a>
-     */
-    public Path quadTo(float x1, float y1, float x2, float y2) {
-        Stats.onNativeCall();
-        _nQuadTo(_ptr, x1, y1, x2, y2);
-        return this;
-    }
-
-    /**
-     * <p>Adds quad from last point towards Point p1, to Point p2.</p>
-     *
-     * <p>If Path is empty, or last {@link PathVerb} is {@link PathVerb#CLOSE}, last point is set to (0, 0)
-     * before adding quad.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed;
-     * then appends {@link PathVerb#QUAD} to verb array; and Point p1, p2
-     * to Point array.</p>
-     *
-     * @param p1  control Point of added quad
-     * @param p2  end Point of added quad
-     * @return    reference to Path
-     */
-    public Path quadTo(Point p1, Point p2) {
-        return quadTo(p1._x, p1._y, p2._x, p2._y);
-    }
-
-    /**
-     * <p>Adds quad from last point towards vector (dx1, dy1), to vector (dx2, dy2).
-     * If Path is empty, or last {@link PathVerb}
-     * is {@link PathVerb#CLOSE}, last point is set to (0, 0) before adding quad.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array,
-     * if needed; then appends {@link PathVerb#QUAD} to verb array; and appends quad
-     * control and quad end to Point array.</p>
-     *
-     * <p>Quad control is last point plus vector (dx1, dy1).</p>
-     *
-     * <p>Quad end is last point plus vector (dx2, dy2).</p>
-     *
-     * <p>Function name stands for "relative quad to".</p>
-     *
-     * @param dx1  offset from last point to quad control on x-axis
-     * @param dy1  offset from last point to quad control on y-axis
-     * @param dx2  offset from last point to quad end on x-axis
-     * @param dy2  offset from last point to quad end on y-axis
-     * @return     reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Conic_Weight_a">https://fiddle.skia.org/c/@Conic_Weight_a</a>
-     * @see <a href="https://fiddle.skia.org/c/@Conic_Weight_b">https://fiddle.skia.org/c/@Conic_Weight_b</a>
-     * @see <a href="https://fiddle.skia.org/c/@Conic_Weight_c">https://fiddle.skia.org/c/@Conic_Weight_c</a>
-     * @see <a href="https://fiddle.skia.org/c/@Path_rQuadTo">https://fiddle.skia.org/c/@Path_rQuadTo</a>
-     */
-    public Path rQuadTo(float dx1, float dy1, float dx2, float dy2) {
-        Stats.onNativeCall();
-        _nRQuadTo(_ptr, dx1, dy1, dx2, dy2);
-        return this;
-    }
-
-    /** 
-     * <p>Adds conic from last point towards (x1, y1), to (x2, y2), weighted by w.</p>
-     *
-     * <p>If Path is empty, or last {@link PathVerb} is {@link PathVerb#CLOSE}, last point is set to (0, 0)
-     * before adding conic.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed.</p>
-     *
-     * <p>If w is finite and not one, appends {@link PathVerb#CONIC} to verb array;
-     * and (x1, y1), (x2, y2) to Point array; and w to conic weights.</p>
-     *
-     * <p>If w is one, appends {@link PathVerb#QUAD} to verb array, and
-     * (x1, y1), (x2, y2) to Point array.</p>
-     *
-     * <p>If w is not finite, appends {@link PathVerb#LINE} twice to verb array, and
-     * (x1, y1), (x2, y2) to Point array.</p>
-     *
-     * @param x1  control Point of conic on x-axis
-     * @param y1  control Point of conic on y-axis
-     * @param x2  end Point of conic on x-axis
-     * @param y2  end Point of conic on y-axis
-     * @param w   weight of added conic
-     * @return    reference to Path
-     */
-    public Path conicTo(float x1, float y1, float x2, float y2, float w) {
-        Stats.onNativeCall();
-        _nConicTo(_ptr, x1, y1, x2, y2, w);
-        return this;
-    }
-
-    /** 
-     * <p>Adds conic from last point towards Point p1, to Point p2, weighted by w.</p>
-     *
-     * <p>If Path is empty, or last {@link PathVerb} is {@link PathVerb#CLOSE}, last point is set to (0, 0)
-     * before adding conic.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed.</p>
-     *
-     * <p>If w is finite and not one, appends {@link PathVerb#CONIC} to verb array;
-     * and Point p1, p2 to Point array; and w to conic weights.</p>
-     *
-     * <p>If w is one, appends {@link PathVerb#QUAD} to verb array, and Point p1, p2
-     * to Point array.</p>
-     *
-     * <p>If w is not finite, appends {@link PathVerb#LINE} twice to verb array, and
-     * Point p1, p2 to Point array.</p>
-     *
-     * @param p1  control Point of added conic
-     * @param p2  end Point of added conic
-     * @param w   weight of added conic
-     * @return    reference to Path
-     */
-    public Path conicTo(Point p1, Point p2, float w) {
-        return conicTo(p1._x, p1._y, p2._x, p2._y, w);
-    }
-
-    /**
-     * <p>Adds conic from last point towards vector (dx1, dy1), to vector (dx2, dy2),
-     * weighted by w. If Path is empty, or last {@link PathVerb}
-     * is {@link PathVerb#CLOSE}, last point is set to (0, 0) before adding conic.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array,
-     * if needed.</p>
-     *
-     * <p>If w is finite and not one, next appends {@link PathVerb#CONIC} to verb array,
-     * and w is recorded as conic weight; otherwise, if w is one, appends
-     * {@link PathVerb#QUAD} to verb array; or if w is not finite, appends {@link PathVerb#LINE}
-     * twice to verb array.</p>
-     *
-     * <p>In all cases appends Point control and end to Point array.
-     * control is last point plus vector (dx1, dy1).
-     * end is last point plus vector (dx2, dy2).</p>
-     *
-     * <p>Function name stands for "relative conic to".</p>
-     *
-     * @param dx1  offset from last point to conic control on x-axis
-     * @param dy1  offset from last point to conic control on y-axis
-     * @param dx2  offset from last point to conic end on x-axis
-     * @param dy2  offset from last point to conic end on y-axis
-     * @param w    weight of added conic
-     * @return     reference to Path
-     */
-    public Path rConicTo(float dx1, float dy1, float dx2, float dy2, float w) {
-        Stats.onNativeCall();
-        _nRConicTo(_ptr, dx1, dy1, dx2, dy2, w);
-        return this;
-    }
-
-    /**
-     * <p>Adds cubic from last point towards (x1, y1), then towards (x2, y2), ending at
-     * (x3, y3). If Path is empty, or last {@link PathVerb} is {@link PathVerb#CLOSE}, last point is set to
-     * (0, 0) before adding cubic.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed;
-     * then appends {@link PathVerb#CUBIC} to verb array; and (x1, y1), (x2, y2), (x3, y3)
-     * to Point array.</p>
-     *
-     * @param x1  first control Point of cubic on x-axis
-     * @param y1  first control Point of cubic on y-axis
-     * @param x2  second control Point of cubic on x-axis
-     * @param y2  second control Point of cubic on y-axis
-     * @param x3  end Point of cubic on x-axis
-     * @param y3  end Point of cubic on y-axis
-     * @return    reference to Path
-     */
-    public Path cubicTo(float x1, float y1, float x2, float y2, float x3, float y3) {
-        Stats.onNativeCall();
-        _nCubicTo(_ptr, x1, y1, x2, y2, x3, y3);
-        return this;
-    }
-
-    /**
-     * <p>Adds cubic from last point towards Point p1, then towards Point p2, ending at
-     * Point p3. If Path is empty, or last {@link PathVerb} is {@link PathVerb#CLOSE}, last point is set to
-     * (0, 0) before adding cubic.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array, if needed;
-     * then appends {@link PathVerb#CUBIC} to verb array; and Point p1, p2, p3
-     * to Point array.</p>
-     *
-     * @param p1  first control Point of cubic
-     * @param p2  second control Point of cubic
-     * @param p3  end Point of cubic
-     * @return    reference to Path
-     */
-    public Path cubicTo(Point p1, Point p2, Point p3) {
-        return cubicTo(p1._x, p1._y, p2._x, p2._y, p3._x, p3._y);
-    }
-
-    /**
-     * <p>Adds cubic from last point towards vector (dx1, dy1), then towards
-     * vector (dx2, dy2), to vector (dx3, dy3).
-     * If Path is empty, or last {@link PathVerb}
-     * is {@link PathVerb#CLOSE}, last point is set to (0, 0) before adding cubic.</p>
-     *
-     * <p>Appends {@link PathVerb#MOVE} to verb array and (0, 0) to Point array,
-     * if needed; then appends {@link PathVerb#CUBIC} to verb array; and appends cubic
-     * control and cubic end to Point array.</p>
-     *
-     * <p>Cubic control is last point plus vector (dx1, dy1).</p>
-     *
-     * <p>Cubic end is last point plus vector (dx2, dy2).</p>
-     *
-     * <p>Function name stands for "relative cubic to".</p>
-     *
-     * @param dx1  offset from last point to first cubic control on x-axis
-     * @param dy1  offset from last point to first cubic control on y-axis
-     * @param dx2  offset from last point to second cubic control on x-axis
-     * @param dy2  offset from last point to second cubic control on y-axis
-     * @param dx3  offset from last point to cubic end on x-axis
-     * @param dy3  offset from last point to cubic end on y-axis
-     * @return    reference to Path
-     */
-    public Path rCubicTo(float dx1, float dy1, float dx2, float dy2, float dx3, float dy3) {
-        Stats.onNativeCall();
-        _nRCubicTo(_ptr, dx1, dy1, dx2, dy2, dx3, dy3);
-        return this;
-    }
-
-    /**
-     * <p>Appends arc to Path. Arc added is part of ellipse
-     * bounded by oval, from startAngle through sweepAngle. Both startAngle and
-     * sweepAngle are measured in degrees, where zero degrees is aligned with the
-     * positive x-axis, and positive sweeps extends arc clockwise.</p>
-     *
-     * <p>arcTo() adds line connecting Path last Point to initial arc Point if forceMoveTo
-     * is false and Path is not empty. Otherwise, added contour begins with first point
-     * of arc. Angles greater than -360 and less than 360 are treated modulo 360.</p>
-     *
-     * @param oval         bounds of ellipse containing arc
-     * @param startAngle   starting angle of arc in degrees
-     * @param sweepAngle   sweep, in degrees. Positive is clockwise; treated modulo 360
-     * @param forceMoveTo  true to start a new contour with arc
-     * @return             reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_arcTo">https://fiddle.skia.org/c/@Path_arcTo</a>
-     */
-    public Path arcTo(Rect oval, float startAngle, float sweepAngle, boolean forceMoveTo) {
-        Stats.onNativeCall();
-        _nArcTo(_ptr, oval._left, oval._top, oval._right, oval._bottom, startAngle, sweepAngle, forceMoveTo);
-        return this;
-    }
-
-    /** 
-     * <p>Appends arc to Path, after appending line if needed. Arc is implemented by conic
-     * weighted to describe part of circle. Arc is contained by tangent from
-     * last Path point to (x1, y1), and tangent from (x1, y1) to (x2, y2). Arc
-     * is part of circle sized to radius, positioned so it touches both tangent lines.</p>
-     *
-     * <p>If last Path Point does not start Arc, tangentArcTo appends connecting Line to Path.
-     * The length of Vector from (x1, y1) to (x2, y2) does not affect Arc.</p>
-     *
-     * <p>Arc sweep is always less than 180 degrees. If radius is zero, or if
-     * tangents are nearly parallel, tangentArcTo appends Line from last Path Point to (x1, y1).</p>
-     *
-     * <p>tangentArcTo appends at most one Line and one conic.</p>
-     *
-     * <p>tangentArcTo implements the functionality of PostScript arct and HTML Canvas tangentArcTo.</p>
-     *
-     * @param x1      x-axis value common to pair of tangents
-     * @param y1      y-axis value common to pair of tangents
-     * @param x2      x-axis value end of second tangent
-     * @param y2      y-axis value end of second tangent
-     * @param radius  distance from arc to circle center
-     * @return        reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_arcTo_2_a">https://fiddle.skia.org/c/@Path_arcTo_2_a</a>
-     * @see <a href="https://fiddle.skia.org/c/@Path_arcTo_2_b">https://fiddle.skia.org/c/@Path_arcTo_2_b</a>
-     * @see <a href="https://fiddle.skia.org/c/@Path_arcTo_2_c">https://fiddle.skia.org/c/@Path_arcTo_2_c</a>
-     */
-    public Path tangentArcTo(float x1, float y1, float x2, float y2, float radius) {
-        Stats.onNativeCall();
-        _nTangentArcTo(_ptr, x1, y1, x2, y2, radius);
-        return this;
-    }
-        
-    /**
-     * <p>Appends arc to Path, after appending line if needed. Arc is implemented by conic
-     * weighted to describe part of circle. Arc is contained by tangent from
-     * last Path point to p1, and tangent from p1 to p2. Arc
-     * is part of circle sized to radius, positioned so it touches both tangent lines.</p>
-     *
-     * <p>If last Path Point does not start arc, tangentArcTo() appends connecting line to Path.
-     * The length of vector from p1 to p2 does not affect arc.</p>
-     *
-     * <p>Arc sweep is always less than 180 degrees. If radius is zero, or if
-     * tangents are nearly parallel, tangentArcTo() appends line from last Path Point to p1.</p>
-     *
-     * <p>tangentArcTo() appends at most one line and one conic.</p>
-     * 
-     * <p>tangentArcTo() implements the functionality of PostScript arct and HTML Canvas tangentArcTo.</p>
-     *
-     * @param p1      Point common to pair of tangents
-     * @param p2      end of second tangent
-     * @param radius  distance from arc to circle center
-     * @return        reference to Path
-     */
-    public Path tangentArcTo(Point p1, Point p2, float radius) {
-        return tangentArcTo(p1._x, p1._y, p2._x, p2._y, radius);
-    }
-
-    /** <p>Appends arc to Path. Arc is implemented by one or more conics weighted to
-     * describe part of oval with radii (rx, ry) rotated by xAxisRotate degrees. Arc
-     * curves from last Path Point to (x, y), choosing one of four possible routes:
-     * clockwise or counterclockwise, and smaller or larger.</p>
-     *
-     * <p>Arc sweep is always less than 360 degrees. ellipticalArcTo() appends line to (x, y) if
-     * either radii are zero, or if last Path Point equals (x, y). ellipticalArcTo() scales radii
-     * (rx, ry) to fit last Path Point and (x, y) if both are greater than zero but
-     * too small.</p>
-     *
-     * <p>ellipticalArcTo() appends up to four conic curves.</p>
-     *
-     * <p>ellipticalArcTo() implements the functionality of SVG arc, although SVG sweep-flag value
-     * is opposite the integer value of sweep; SVG sweep-flag uses 1 for clockwise,
-     * while {@link PathDirection#CLOCKWISE} cast to int is zero.</p>
-     *
-     * @param rx           radius on x-axis before x-axis rotation
-     * @param ry           radius on y-axis before x-axis rotation
-     * @param xAxisRotate  x-axis rotation in degrees; positive values are clockwise
-     * @param arc          chooses smaller or larger arc
-     * @param direction    chooses clockwise or counterclockwise arc
-     * @param x            end of arc
-     * @param y            end of arc
-     * @return             reference to Path
-     */
-    public Path ellipticalArcTo(float rx, float ry, float xAxisRotate, PathEllipseArc arc, PathDirection direction, float x, float y) {
-        Stats.onNativeCall();
-        _nEllipticalArcTo(_ptr, rx, ry, xAxisRotate, arc.ordinal(), direction.ordinal(), x, y);
-        return this;
-    }
-
-    /**
-     * <p>Appends arc to Path. Arc is implemented by one or more conic weighted to describe
-     * part of oval with radii (r.fX, r.fY) rotated by xAxisRotate degrees. Arc curves
-     * from last Path Point to (xy.fX, xy.fY), choosing one of four possible routes:
-     * clockwise or counterclockwise, and smaller or larger.</p>
-     *
-     * <p>Arc sweep is always less than 360 degrees. ellipticalArcTo() appends line to xy if either
-     * radii are zero, or if last Path Point equals (xy.fX, xy.fY). ellipticalArcTo() scales radii r to
-     * fit last Path Point and xy if both are greater than zero but too small to describe
-     * an arc.</p>
-     *
-     * <p>ellipticalArcTo() appends up to four conic curves.</p>
-     *
-     * <p>ellipticalArcTo() implements the functionality of SVG arc, although SVG sweep-flag value is
-     * opposite the integer value of sweep; SVG sweep-flag uses 1 for clockwise, while
-     * {@link PathDirection#CLOCKWISE} cast to int is zero.</p>
-     *
-     * @param r            radii on axes before x-axis rotation
-     * @param xAxisRotate  x-axis rotation in degrees; positive values are clockwise
-     * @param arc          chooses smaller or larger arc
-     * @param direction    chooses clockwise or counterclockwise arc
-     * @param xy           end of arc
-     * @return             reference to Path
-     */
-    public Path ellipticalArcTo(Point r, float xAxisRotate, PathEllipseArc arc, PathDirection direction, Point xy) {
-        return ellipticalArcTo(r._x, r._y, xAxisRotate, arc, direction, xy._x, xy._y);
-    }
-
-    /**
-     * <p>Appends arc to Path, relative to last Path Point. Arc is implemented by one or
-     * more conic, weighted to describe part of oval with radii (rx, ry) rotated by
-     * xAxisRotate degrees. Arc curves from last Path Point to relative end Point:
-     * (dx, dy), choosing one of four possible routes: clockwise or
-     * counterclockwise, and smaller or larger. If Path is empty, the start arc Point
-     * is (0, 0).</p>
-     *
-     * <p>Arc sweep is always less than 360 degrees. rEllipticalArcTo() appends line to end Point
-     * if either radii are zero, or if last Path Point equals end Point.
-     * rEllipticalArcTo() scales radii (rx, ry) to fit last Path Point and end Point if both are
-     * greater than zero but too small to describe an arc.</p>
-     *
-     * <p>rEllipticalArcTo() appends up to four conic curves.</p>
-     *
-     * <p>rEllipticalArcTo() implements the functionality of svg arc, although SVG "sweep-flag" value is
-     * opposite the integer value of sweep; SVG "sweep-flag" uses 1 for clockwise, while
-     * {@link PathDirection#CLOCKWISE} cast to int is zero.</p>
-     *
-     * @param rx           radius before x-axis rotation
-     * @param ry           radius before x-axis rotation
-     * @param xAxisRotate  x-axis rotation in degrees; positive values are clockwise
-     * @param arc          chooses smaller or larger arc
-     * @param direction    chooses clockwise or counterclockwise arc
-     * @param dx           x-axis offset end of arc from last Path Point
-     * @param dy           y-axis offset end of arc from last Path Point
-     * @return             reference to Path
-     */
-    public Path rEllipticalArcTo(float rx, float ry, float xAxisRotate, PathEllipseArc arc, PathDirection direction, float dx, float dy) {
-        Stats.onNativeCall();
-        _nREllipticalArcTo(_ptr, rx, ry, xAxisRotate, arc.ordinal(), direction.ordinal(), dx, dy);
-        return this;
-    }
-
-    /**
-     * <p>Appends {@link PathVerb#CLOSE} to Path. A closed contour connects the first and last Point
-     * with line, forming a continuous loop. Open and closed contour draw the same
-     * with {@link PaintMode#FILL}. With {@link PaintMode#STROKE}, open contour draws
-     * {@link PaintStrokeCap} at contour start and end; closed contour draws
-     * {@link PaintStrokeJoin} at contour start and end.</p>
-     *
-     * <p>closePath() has no effect if Path is empty or last Path {@link PathVerb} is {@link PathVerb#CLOSE}.</p>
-     *
-     * @return  reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_close">https://fiddle.skia.org/c/@Path_close</a>
-     */
-    public Path closePath() {
-        Stats.onNativeCall();
-        _nClosePath(_ptr);
-        return this;
-    }
-
-    /**
      * <p>Approximates conic with quad array. Conic is constructed from start Point p0,
      * control Point p1, end Point p2, and weight w.</p>
-     * 
+     *
      * <p>Quad array is stored in pts; this storage is supplied by caller.</p>
      *
      * <p>Maximum quad count is 2 to the pow2.</p>
@@ -1200,7 +827,8 @@ public class Path extends Managed implements Iterable<PathSegment> {
      * @param pow2  quad count, as power of two, normally 0 to 5 (1 to 32 quad curves)
      * @return      number of quad curves written to pts
      */
-    public static Point[] convertConicToQuads(Point p0, Point p1, Point p2, float w, int pow2) {
+    @NotNull @Contract(pure = true)
+    public static Point[] convertConicToQuads(@NotNull Point p0, @NotNull Point p1, @NotNull Point p2, float w, int pow2) {
         Stats.onNativeCall();
         return _nConvertConicToQuads(p0._x, p0._y, p1._x, p1._y, p2._x, p2._y, w, pow2);
     }
@@ -1215,6 +843,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_isRect">https://fiddle.skia.org/c/@Path_isRect</a>
      */
+    @Nullable @Contract(pure = true)
     public Rect isRect() {
         try {
             Stats.onNativeCall();
@@ -1225,526 +854,71 @@ public class Path extends Managed implements Iterable<PathSegment> {
     }
 
     /**
-     * Adds Rect to Path, appending {@link PathVerb#MOVE}, three {@link PathVerb#LINE}, and {@link PathVerb#CLOSE},
-     * starting with top-left corner of Rect; followed by top-right, bottom-right,
-     * and bottom-left.
+     * <p>Return a copy of {@link Path} with verb array, {@link Point} array,
+     * and weight transformed by matrix. {@link #makeTransform(Matrix33)} may
+     * change verbs and increase their number.</p>
      *
-     * @param rect  Rect to add as a closed contour
-     * @return      reference to Path
+     * <p>If the resulting path has any non-finite values, returns null.</p>
      *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addRect">https://fiddle.skia.org/c/@Path_addRect</a>
+     * @param matrix  {@link Matrix33} to apply to {@link Path}
+     * @return        {@link Path} if finite, or null
      */
-    public Path addRect(Rect rect) {
-        return addRect(rect, PathDirection.CLOCKWISE, 0);
-    }
-
-    /**
-     * Adds Rect to Path, appending {@link PathVerb#MOVE}, three {@link PathVerb#LINE}, and {@link PathVerb#CLOSE},
-     * starting with top-left corner of Rect; followed by top-right, bottom-right,
-     * and bottom-left if dir is {@link PathDirection#CLOCKWISE}; or followed by bottom-left,
-     * bottom-right, and top-right if dir is {@link PathDirection#COUNTER_CLOCKWISE}.
-     *
-     * @param rect  Rect to add as a closed contour
-     * @param dir   Direction to wind added contour
-     * @return      reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addRect">https://fiddle.skia.org/c/@Path_addRect</a>
-     */
-    public Path addRect(Rect rect, PathDirection dir) {
-        return addRect(rect, dir, 0);
-    }
-
-    /**
-     * Adds Rect to Path, appending {@link PathVerb#MOVE}, three {@link PathVerb#LINE}, and {@link PathVerb#CLOSE}.
-     * If dir is {@link PathDirection#CLOCKWISE}, Rect corners are added clockwise; if dir is
-     * {@link PathDirection#COUNTER_CLOCKWISE}, Rect corners are added counterclockwise.
-     * start determines the first corner added.
-     *
-     * @param rect   Rect to add as a closed contour
-     * @param dir    Direction to wind added contour
-     * @param start  initial corner of Rect to add. 0 for top left, 1 for top right, 2 for lower right, 3 for lower left
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addRect_2">https://fiddle.skia.org/c/@Path_addRect_2</a>
-     */
-    public Path addRect(Rect rect, PathDirection dir, int start) {
-        Stats.onNativeCall();
-        _nAddRect(_ptr, rect._left, rect._top, rect._right, rect._bottom, dir.ordinal(), start);
-        return this;
-    }
-
-    /**
-     * <p>Adds oval to path, appending {@link PathVerb#MOVE}, four {@link PathVerb#CONIC}, and {@link PathVerb#CLOSE}.</p>
-     *
-     * <p>Oval is upright ellipse bounded by Rect oval with radii equal to half oval width
-     * and half oval height. Oval begins at (oval.fRight, oval.centerY()) and continues
-     * clockwise.</p>
-     *
-     * @param oval  bounds of ellipse added
-     * @return      reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addOval">https://fiddle.skia.org/c/@Path_addOval</a>
-     */
-
-    public Path addOval(Rect oval) {
-        return addOval(oval, PathDirection.CLOCKWISE, 1);
-    }
-
-    /**
-     * <p>Adds oval to path, appending {@link PathVerb#MOVE}, four {@link PathVerb#CONIC}, and {@link PathVerb#CLOSE}.</p>
-     *
-     * <p>Oval is upright ellipse bounded by Rect oval with radii equal to half oval width
-     * and half oval height. Oval begins at (oval.fRight, oval.centerY()) and continues
-     * clockwise if dir is {@link PathDirection#CLOCKWISE}, counterclockwise if dir is {@link PathDirection#COUNTER_CLOCKWISE}.</p>
-     *
-     * @param oval  bounds of ellipse added
-     * @param dir   Direction to wind ellipse
-     * @return      reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addOval">https://fiddle.skia.org/c/@Path_addOval</a>
-     */
-    public Path addOval(Rect oval, PathDirection dir) {
-        return addOval(oval, dir, 1);
-    }
-
-    /**
-     * Adds oval to Path, appending {@link PathVerb#MOVE}, four {@link PathVerb#CONIC}, and {@link PathVerb#CLOSE}.
-     * Oval is upright ellipse bounded by Rect oval with radii equal to half oval width
-     * and half oval height. Oval begins at start and continues
-     * clockwise if dir is {@link PathDirection#CLOCKWISE}, counterclockwise if dir is {@link PathDirection#COUNTER_CLOCKWISE}.
-     *
-     * @param oval   bounds of ellipse added
-     * @param dir    Direction to wind ellipse
-     * @param start  index of initial point of ellipse. 0 for top, 1 for right, 2 for bottom, 3 for left
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addOval_2">https://fiddle.skia.org/c/@Path_addOval_2</a>
-     */
-    public Path addOval(Rect oval, PathDirection dir, int start) {
-        Stats.onNativeCall();
-        _nAddOval(_ptr, oval._left, oval._top, oval._right, oval._bottom, dir.ordinal(), start);
-        return this;
-    }
-
-    /** 
-     * <p>Adds circle centered at (x, y) of size radius to Path, appending {@link PathVerb#MOVE},
-     * four {@link PathVerb#CONIC}, and {@link PathVerb#CLOSE}. Circle begins at: (x + radius, y)</p>
-     *
-     * <p>Has no effect if radius is zero or negative.</p>
-     *
-     * @param x       center of circle
-     * @param y       center of circle
-     * @param radius  distance from center to edge
-     * @return        reference to Path
-     */
-    public Path addCircle(float x, float y, float radius) {
-        return addCircle(x, y, radius, PathDirection.CLOCKWISE);
-    }
-
-    /** 
-     * <p>Adds circle centered at (x, y) of size radius to Path, appending {@link PathVerb#MOVE},
-     * four {@link PathVerb#CONIC}, and {@link PathVerb#CLOSE}. Circle begins at: (x + radius, y), continuing
-     * clockwise if dir is {@link PathDirection#CLOCKWISE}, and counterclockwise if dir is {@link PathDirection#COUNTER_CLOCKWISE}.</p>
-     *
-     * <p>Has no effect if radius is zero or negative.</p>
-     *
-     * @param x       center of circle
-     * @param y       center of circle
-     * @param radius  distance from center to edge
-     * @param dir     Direction to wind circle
-     * @return        reference to Path
-     */
-    public Path addCircle(float x, float y, float radius, PathDirection dir) {
-        Stats.onNativeCall();
-        _nAddCircle(_ptr, x, y, radius, dir.ordinal());
-        return this;
-    }
-
-    /**
-     * <p>Appends arc to Path, as the start of new contour. Arc added is part of ellipse
-     * bounded by oval, from startAngle through sweepAngle. Both startAngle and
-     * sweepAngle are measured in degrees, where zero degrees is aligned with the
-     * positive x-axis, and positive sweeps extends arc clockwise.</p>
-     *
-     * <p>If sweepAngle &le; -360, or sweepAngle &ge; 360; and startAngle modulo 90 is nearly
-     * zero, append oval instead of arc. Otherwise, sweepAngle values are treated
-     * modulo 360, and arc may or may not draw depending on numeric rounding.</p>
-     *
-     * @param oval        bounds of ellipse containing arc
-     * @param startAngle  starting angle of arc in degrees
-     * @param sweepAngle  sweep, in degrees. Positive is clockwise; treated modulo 360
-     * @return            reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addArc">https://fiddle.skia.org/c/@Path_addArc</a>
-     */
-    public Path addArc(Rect oval, float startAngle, float sweepAngle) {
-        Stats.onNativeCall();
-        _nAddArc(_ptr, oval._left, oval._top, oval._right, oval._bottom, startAngle, sweepAngle);
-        return this;
-    }
-
-    /**
-     * <p>Adds rrect to Path, creating a new closed contour. RRect starts at top-left of the lower-left corner and
-     * winds clockwise.</p>
-     *
-     * <p>After appending, Path may be empty, or may contain: Rect, Oval, or RRect.</p>
-     *
-     * @param rrect  bounds and radii of rounded rectangle
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addRRect">https://fiddle.skia.org/c/@Path_addRRect</a>
-     */
-    public Path addRRect(RRect rrect) {
-        return addRRect(rrect, PathDirection.CLOCKWISE, 6);
-    }
-
-    /**
-     * <p>Adds rrect to Path, creating a new closed contour. If
-     * dir is {@link PathDirection#CLOCKWISE}, rrect starts at top-left of the lower-left corner and
-     * winds clockwise. If dir is {@link PathDirection#COUNTER_CLOCKWISE}, rrect starts at the bottom-left
-     * of the upper-left corner and winds counterclockwise.</p>
-     *
-     * <p>After appending, Path may be empty, or may contain: Rect, Oval, or RRect.</p>
-     *
-     * @param rrect  bounds and radii of rounded rectangle
-     * @param dir    Direction to wind RRect
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addRRect">https://fiddle.skia.org/c/@Path_addRRect</a>
-     */
-    public Path addRRect(RRect rrect, PathDirection dir) {
-        return addRRect(rrect, dir, dir == PathDirection.CLOCKWISE ? 6 : 7);
-    }
-
-    /**
-     * <p>Adds rrect to Path, creating a new closed contour. If dir is {@link PathDirection#CLOCKWISE}, rrect
-     * winds clockwise; if dir is {@link PathDirection#COUNTER_CLOCKWISE}, rrect winds counterclockwise.
-     * start determines the first point of rrect to add.</p>
-     *
-     * @param rrect  bounds and radii of rounded rectangle
-     * @param dir    Direction to wind RRect
-     * @param start  index of initial point of RRect. 0 for top-right end of the arc at top left,
-     *               1 for top-left end of the arc at top right, 2 for bottom-right end of top right arc, etc.
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addRRect_2">https://fiddle.skia.org/c/@Path_addRRect_2</a>
-     */
-    public Path addRRect(RRect rrect, PathDirection dir, int start) {
-        Stats.onNativeCall();
-        _nAddRRect(_ptr, rrect._left, rrect._top, rrect._right, rrect._bottom, rrect._radii, dir.ordinal(), start);
-        return this;
-    }
-
-    /**
-     * <p>Adds contour created from line array, adding (pts.length - 1) line segments.
-     * Contour added starts at pts[0], then adds a line for every additional Point
-     * in pts array. If close is true, appends {@link PathVerb#CLOSE} to Path, connecting
-     * pts[pts.length - 1] and pts[0].</p>
-     *
-     * <p>If pts is empty, append {@link PathVerb#MOVE} to path.</p>
-     *
-     * @param pts    array of line sharing end and start Point
-     * @param close  true to add line connecting contour end and start
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addPoly">https://fiddle.skia.org/c/@Path_addPoly</a>
-     */
-    public Path addPoly(Point[] pts, boolean close) {
-        float[] flat = new float[pts.length * 2];
-        for (int i = 0; i < pts.length; ++i) {
-            flat[i * 2] = pts[i]._x;
-            flat[i * 2 + 1] = pts[i]._y;
-        }
-        return addPoly(flat, close);
-    }
-
-    /**
-     * <p>Adds contour created from line array, adding (pts.length / 2 - 1) line segments.
-     * Contour added starts at (pts[0], pts[1]), then adds a line for every additional pair of floats
-     * in pts array. If close is true, appends {@link PathVerb#CLOSE} to Path, connecting
-     * (pts[count - 2], pts[count - 1]) and (pts[0], pts[1]).</p>
-     *
-     * <p>If pts is empty, append {@link PathVerb#MOVE} to path.</p>
-     *
-     * @param pts    flat array of line sharing end and start Point
-     * @param close  true to add line connecting contour end and start
-     * @return       reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_addPoly">https://fiddle.skia.org/c/@Path_addPoly</a>
-     */
-    public Path addPoly(float[] pts, boolean close) {
-        assert pts.length % 2 == 0 : "Expected even amount of pts, got " + pts.length;
-        Stats.onNativeCall();
-        _nAddPoly(_ptr, pts, close);
-        return this;
-    }
-
-    /**
-     * <p>Appends src to Path.</p>
-     *
-     * <p>src verb array, Point array, and conic weights are
-     * added unaltered.</p>
-     *
-     * @param src  Path verbs, Point, and conic weights to add
-     * @return     reference to Path
-     */
-    public Path addPath(Path src) {
-        return addPath(src, false);
-    }
-
-    /**
-     * <p>Appends src to Path.</p>
-     *
-     * <p>If extend is false, src verb array, Point array, and conic weights are
-     * added unaltered. If extend is true, add line before appending
-     * verbs, Point, and conic weights.</p>
-     *
-     * @param src     Path verbs, Point, and conic weights to add
-     * @param extend  if should add a line before appending verbs
-     * @return        reference to Path
-     */
-    public Path addPath(Path src, boolean extend) {
+    @Nullable @Contract("_ -> new")
+    public Path makeTransform(@NotNull Matrix33 matrix) {
         try {
             Stats.onNativeCall();
-            _nAddPath(_ptr, Native.getPtr(src), extend);
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(src);
-        }
-    }
-
-    /**
-     * <p>Appends src to Path, offset by (dx, dy).</p>
-     *
-     * <p>Src verb array, Point array, and conic weights are
-     * added unaltered.</p>
-     *
-     * @param src     Path verbs, Point, and conic weights to add
-     * @param dx      offset added to src Point array x-axis coordinates
-     * @param dy      offset added to src Point array y-axis coordinates
-     * @return        reference to Path
-     */
-    public Path addPath(Path src, float dx, float dy) {
-        return addPath(src, dx, dy, false);
-    }
-
-    /**
-     * <p>Appends src to Path, offset by (dx, dy).</p>
-     *
-     * <p>If extend is false, src verb array, Point array, and conic weights are
-     * added unaltered. If extend is true, add line before appending
-     * verbs, Point, and conic weights.</p>
-     *
-     * @param src     Path verbs, Point, and conic weights to add
-     * @param dx      offset added to src Point array x-axis coordinates
-     * @param dy      offset added to src Point array y-axis coordinates
-     * @param extend  if should add a line before appending verbs
-     * @return        reference to Path
-     */
-    public Path addPath(Path src, float dx, float dy, boolean extend) {
-        try {
-            Stats.onNativeCall();
-            _nAddPathOffset(_ptr, Native.getPtr(src), dx, dy, extend);
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(src);
-        }
-    }
-
-    /**
-     * <p>Appends src to Path, transformed by matrix. Transformed curves may have different
-     * verbs, Point, and conic weights.</p>
-     *
-     * <p>Src verb array, Point array, and conic weights are
-     * added unaltered.</p>
-     *
-     * @param src     Path verbs, Point, and conic weights to add
-     * @param matrix  transform applied to src
-     * @return        reference to Path
-     */
-    public Path addPath(Path src, Matrix33 matrix) {
-        return addPath(src, matrix, false);
-    }
-
-    /**
-     * <p>Appends src to Path, transformed by matrix. Transformed curves may have different
-     * verbs, Point, and conic weights.</p>
-     *
-     * <p>If extend is false, src verb array, Point array, and conic weights are
-     * added unaltered. If extend is true, add line before appending
-     * verbs, Point, and conic weights.</p>
-     *
-     * @param src     Path verbs, Point, and conic weights to add
-     * @param matrix  transform applied to src
-     * @param extend  if should add a line before appending verbs
-     * @return        reference to Path
-     */
-    public Path addPath(Path src, Matrix33 matrix, boolean extend) {
-        try {
-            Stats.onNativeCall();
-            _nAddPathTransform(_ptr, Native.getPtr(src), matrix.getMat(), extend);
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(src);
-        }
-    }
-
-    /** 
-     * Appends src to Path, from back to front.
-     * Reversed src always appends a new contour to Path.
-     *
-     * @param src  Path verbs, Point, and conic weights to add
-     * @return     reference to Path
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_reverseAddPath">https://fiddle.skia.org/c/@Path_reverseAddPath</a>
-     */
-    public Path reverseAddPath(Path src) {
-        try {
-            Stats.onNativeCall();
-            _nReverseAddPath(_ptr, Native.getPtr(src));
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(src);
-        }
-    }
-
-    /**
-     * Offsets Point array by (dx, dy). Path is replaced by offset data.
-     *
-     * @param dx  offset added to Point array x-axis coordinates
-     * @param dy  offset added to Point array y-axis coordinates
-     * @return    this
-     */
-    public Path offset(float dx, float dy) {
-        return offset(dx, dy, null);
-    }
-
-    /** 
-     * Offsets Point array by (dx, dy). Offset Path replaces dst.
-     * If dst is null, Path is replaced by offset data.
-     *
-     * @param dx   offset added to Point array x-axis coordinates
-     * @param dy   offset added to Point array y-axis coordinates
-     * @param dst  overwritten, translated copy of Path; may be null
-     * @return     this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_offset">https://fiddle.skia.org/c/@Path_offset</a>
-     */
-    public Path offset(float dx, float dy, Path dst) {
-        try {
-            Stats.onNativeCall();
-            _nOffset(_ptr, dx, dy, Native.getPtr(dst));
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(dst);
-        }
-    }
-
-    /**
-     * Transforms verb array, Point array, and weight by matrix.
-     * transform may change verbs and increase their number.
-     * Path is replaced by transformed data.
-     *
-     * @param matrix  matrix to apply to Path
-     * @return  this
-     */
-    public Path transform(Matrix33 matrix) {
-        return transform(matrix, null, true);
-    }
-
-    /**
-     * Transforms verb array, Point array, and weight by matrix.
-     * transform may change verbs and increase their number.
-     * Path is replaced by transformed data.
-     *
-     * @param matrix                matrix to apply to Path
-     * @param applyPerspectiveClip  whether to apply perspective clipping
-     * @return                      this
-     */
-    public Path transform(Matrix33 matrix, boolean applyPerspectiveClip) {
-        return transform(matrix, null, applyPerspectiveClip);
-    }
-
-    /**
-     * Transforms verb array, Point array, and weight by matrix.
-     * transform may change verbs and increase their number.
-     * Transformed Path replaces dst; if dst is null, original data
-     * is replaced.
-     *
-     * @param matrix  matrix to apply to Path
-     * @param dst     overwritten, transformed copy of Path; may be null
-     * @return        this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_transform">https://fiddle.skia.org/c/@Path_transform</a>
-     */
-    public Path transform(Matrix33 matrix, Path dst) {
-        return transform(matrix, dst, true);
-    }
-
-    /**
-     * Transforms verb array, Point array, and weight by matrix.
-     * transform may change verbs and increase their number.
-     * Transformed Path replaces dst; if dst is null, original data
-     * is replaced.
-     *
-     * @param matrix                matrix to apply to Path
-     * @param dst                   overwritten, transformed copy of Path; may be null
-     * @param applyPerspectiveClip  whether to apply perspective clipping
-     * @return                      this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_transform">https://fiddle.skia.org/c/@Path_transform</a>
-     */
-    public Path transform(Matrix33 matrix, Path dst, boolean applyPerspectiveClip) {
-        try {
-            Stats.onNativeCall();
-            _nTransform(_ptr, matrix.getMat(), Native.getPtr(dst), applyPerspectiveClip);
-            return this;
-        } finally {
-            ReferenceUtil.reachabilityFence(dst);
-        }
-    }
-
-    /**
-     * Returns last point on Path in lastPt. Returns null if Point array is empty.
-     *
-     * @return        point if Point array contains one or more Point, null otherwise
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_getLastPt">https://fiddle.skia.org/c/@Path_getLastPt</a>
-     */
-    public Point getLastPt() {
-        try {
-            Stats.onNativeCall();
-            return _nGetLastPt(_ptr);
+            long ptr = _nMakeTransform(_ptr, matrix._mat);
+            return ptr == 0 ? null : new Path(ptr);
         } finally {
             ReferenceUtil.reachabilityFence(this);
         }
     }
 
     /**
-     * Sets last point to (x, y). If Point array is empty, append {@link PathVerb#MOVE} to
-     * verb array and append (x, y) to Point array.
+     * Returns {@link Path} with {@link Point} array offset by (dx, dy).
      *
-     * @param x  set x-axis value of last point
-     * @param y  set y-axis value of last point
-     * @return   this
-     *
-     * @see <a href="https://fiddle.skia.org/c/@Path_setLastPt">https://fiddle.skia.org/c/@Path_setLastPt</a>
+     * @param dx  offset added to {@link Point} array x-axis coordinates
+     * @param dy  offset added to {@link Point} array y-axis coordinates
+     * @return    new {@link Path}
      */
-    public Path setLastPt(float x, float y) {
-        Stats.onNativeCall();
-        _nSetLastPt(_ptr, x, y);
-        return this;
+    @Nullable @Contract("_, _ -> new")
+    public Path makeOffset(float dx, float dy) {
+        try {
+            Stats.onNativeCall();
+            long ptr = _nMakeOffset(_ptr, dx, dy);
+            return ptr == 0 ? null : new Path(ptr);
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
     }
 
     /**
-     * Sets the last point on the path. If Point array is empty, append {@link PathVerb#MOVE} to
-     * verb array and append p to Point array.
+     * Returns {@link Path} with {@link Point} array scaled by s.
      *
-     * @param p  set value of last point
-     * @return   this
+     * @param s  scale applied to {@link Point} array coordinates
+     * @return   new {@link Path}
      */
-    public Path setLastPt(Point p) {
-        return setLastPt(p._x, p._y);
+    @Nullable @Contract("_ -> new")
+    public Path makeScale(float s) {
+        return makeScale(s, s);
+    }
+
+    /**
+     * Returns {@link Path} with {@link Point} array scaled by (sx, sy).
+     *
+     * @param sx  scale applied to {@link Point} array x-axis coordinates
+     * @param sy  scale applied to {@link Point} array y-axis coordinates
+     * @return    new {@link Path}
+     */
+    @Nullable @Contract("_, _ -> new")
+    public Path makeScale(float sx, float sy) {
+        try {
+            Stats.onNativeCall();
+            long ptr = _nMakeScale(_ptr, sx, sy);
+            return ptr == 0 ? null : new Path(ptr);
+        } finally {
+            ReferenceUtil.reachabilityFence(this);
+        }
     }
 
     /**
@@ -1762,6 +936,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      * @see PathSegmentMask#CONIC
      * @see PathSegmentMask#CUBIC
      */
+    @Contract(pure = true)
     public int getSegmentMasks() {
         try {
             Stats.onNativeCall();
@@ -1771,11 +946,100 @@ public class Path extends Managed implements Iterable<PathSegment> {
         }
     }
 
-    @Override
+    /**
+     * <p>Specifies whether Path is volatile; whether it will be altered or discarded
+     * by the caller after it is drawn. Path by default have volatile set false, allowing
+     * SkBaseDevice to attach a cache of data which speeds repeated drawing.</p>
+     *
+     * <p>Mark temporary paths, discarded or modified after use, as volatile
+     * to inform SkBaseDevice that the path need not be cached.</p>
+     *
+     * <p>Mark animating Path volatile to improve performance.
+     * Mark unchanging Path non-volatile to improve repeated rendering.</p>
+     *
+     * <p>raster surface Path draws are affected by volatile for some shadows.
+     * GPU surface Path draws are affected by volatile for some shadows and concave geometries.</p>
+     *
+     * @param isVolatile  true if caller will alter Path after drawing
+     * @return            this
+     */
+    @NotNull @Contract("_ -> this")
+    public Path setVolatile(boolean isVolatile) {
+        Stats.onNativeCall();
+        _nSetVolatile(_ptr, isVolatile);
+        return this;
+    }
+
+    /**
+     * <p>Exchanges the verb array, Point array, weights, and FillMode with other.
+     * Cached state is also exchanged. swap() internally exchanges pointers, so
+     * it is lightweight and does not allocate memory.</p>
+     *
+     * @param   other  Path exchanged by value
+     * @return  this
+     *
+     * @see <a href="https://fiddle.skia.org/c/@Path_swap">https://fiddle.skia.org/c/@Path_swap</a>
+     */
+    @NotNull @Contract("_ -> this")
+    public Path swap(@NotNull Path other) {
+        try {
+            Stats.onNativeCall();
+            _nSwap(_ptr, Native.getPtr(other));
+            return this;
+        } finally {
+            ReferenceUtil.reachabilityFence(other);
+        }
+    }
+
+    /**
+     * Sets {@link PathFillMode}, the rule used to fill {@link Path}
+     *
+     * @return this
+     */
+    @NotNull @Contract("_ -> this")
+    public Path setFillMode(@NotNull PathFillMode fillMode) {
+        Stats.onNativeCall();
+        _nSetFillMode(_ptr, fillMode.ordinal());
+        return this;
+    }
+
+    /**
+     * <p>Sets Path to its initial state.</p>
+     *
+     * <p>Removes verb array, Point array, and weights, and sets FillMode to {@link PathFillMode#WINDING}.
+     * Internal storage associated with Path is released.</p>
+     *
+     * @return  this
+     *
+     * @see <a href="https://fiddle.skia.org/c/@Path_reset">https://fiddle.skia.org/c/@Path_reset</a>
+     */
+    @NotNull @Contract("-> this")
+    public Path reset() {
+        Stats.onNativeCall();
+        _nReset(_ptr);
+        return this;
+    }
+
+    /**
+     * Iterates through verb array, and associated {@link Point} array and conic
+     * weight.
+     *
+     * @return  {@link PathSegmentIterator}
+     */
+    @NotNull @Override
     public PathSegmentIterator iterator() {
         return iterator(false);
     }
 
+    /**
+     * Iterates through verb array, and associated {@link Point} array and conic
+     * weight. Provides options to treat open contours as closed, and to ignore
+     * degenerate data.
+     *
+     * @param forceClose  true if open contours generate {@link PathVerb#CLOSE}
+     * @return            {@link PathSegmentIterator}
+     */
+    @NotNull @Contract("_ -> new")
     public PathSegmentIterator iterator(boolean forceClose) {
         return PathSegmentIterator.make(this, forceClose);
     }
@@ -1790,6 +1054,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_contains">https://fiddle.skia.org/c/@Path_contains</a>
      */
+    @Contract(pure = true)
     public boolean contains(float x, float y) {
         try {
             Stats.onNativeCall();
@@ -1808,7 +1073,8 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_contains">https://fiddle.skia.org/c/@Path_contains</a>
      */
-    public boolean contains(Point p) {
+    @Contract(pure = true)
+    public boolean contains(@NotNull Point p) {
         return contains(p._x, p._y);
     }
 
@@ -1822,6 +1088,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_dump_2">https://fiddle.skia.org/c/@Path_dump_2</a>
      */
+    @NotNull @Contract("-> this")
     public Path dump() {
         Stats.onNativeCall();
         _nDump(_ptr);
@@ -1840,6 +1107,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_dumpHex">https://fiddle.skia.org/c/@Path_dumpHex</a>
      */
+    @NotNull @Contract("-> this")
     public Path dumpHex() {
         Stats.onNativeCall();
         _nDumpHex(_ptr);
@@ -1859,35 +1127,13 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_writeToMemory">https://fiddle.skia.org/c/@Path_writeToMemory</a>
      */
+    @NotNull @Contract(pure = true)
     public byte[] serializeToBytes() {
         try {
             Stats.onNativeCall();
             return _nSerializeToBytes(_ptr);
         } finally {
             ReferenceUtil.reachabilityFence(this);
-        }
-    }
-
-    /**
-     * <p>Returns Path that is the result of applying the Op to the first path and the second path.
-     * <p>The resulting path will be constructed from non-overlapping contours.
-     * <p>The curve order is reduced where possible so that cubics may be turned
-     * into quadratics, and quadratics maybe turned into lines.
-     *
-     * @param one The first operand (for difference, the minuend)
-     * @param two The second operand (for difference, the subtrahend)
-     * @param op  The operator to apply.
-     * @return    Path if operation was able to produce a result, null otherwise
-     */
-    @Nullable
-    public static Path makeCombining(@NotNull Path one, @NotNull Path two, PathOp op) {
-        try {
-            Stats.onNativeCall();
-            long ptr = _nMakeCombining(Native.getPtr(one), Native.getPtr(two), op.ordinal());
-            return ptr == 0 ? null : new Path(ptr);
-        } finally {
-            ReferenceUtil.reachabilityFence(one);
-            ReferenceUtil.reachabilityFence(two);
         }
     }
 
@@ -1902,16 +1148,18 @@ public class Path extends Managed implements Iterable<PathSegment> {
      * the format used for Path in memory is not guaranteed.</p>
      *
      * @param data  storage for Path
-     * @return      reconstructed Path
+     * @return      reconstructed Path, or null if data is invalid
      *
      * @see <a href="https://fiddle.skia.org/c/@Path_readFromMemory">https://fiddle.skia.org/c/@Path_readFromMemory</a>
      */
-    public static Path makeFromBytes(byte[] data) {
+    @Nullable @Contract("_ -> new")
+    public static Path makeFromBytes(@NotNull byte[] data) {
         Stats.onNativeCall();
-        return new Path(_nMakeFromBytes(data));
+        long ptr = _nMakeFromBytes(data);
+        return ptr == 0 ? null : new Path(ptr);
     }
 
-    /** 
+    /**
      * <p>Returns a non-zero, globally unique value. A different value is returned
      * if verb array, Point array, or conic weight changes.</p>
      *
@@ -1925,6 +1173,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      * @see <a href="https://fiddle.skia.org/c/@Path_getGenerationID">https://fiddle.skia.org/c/@Path_getGenerationID</a>
      * @see <a href="https://bugs.chromium.org/p/skia/issues/detail?id=1762">https://bugs.chromium.org/p/skia/issues/detail?id=1762</a>
      */
+    @Contract(pure = true)
     public int getGenerationId() {
         try {
             Stats.onNativeCall();
@@ -1932,7 +1181,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
         } finally {
             ReferenceUtil.reachabilityFence(this);
         }
-    }    
+    }
 
     /**
      * Returns if Path data is consistent. Corrupt Path data is detected if
@@ -1941,6 +1190,7 @@ public class Path extends Managed implements Iterable<PathSegment> {
      *
      * @return  true if Path data is consistent
      */
+    @Contract(pure = true)
     public boolean isValid() {
         try {
             Stats.onNativeCall();
@@ -1956,76 +1206,61 @@ public class Path extends Managed implements Iterable<PathSegment> {
     }
 
     public static native long    _nGetFinalizer();
-    public static native long    _nMake();
+    public static native long    _nMakeRaw(float[] coords, int[] verbs, float[] conicWeights, int fillMode, boolean isVolatile);
+    public static native long    _nMakeRect(float l, float t, float r, float b, int dir, int startIndex);
+    public static native long    _nMakeOval(float l, float t, float r, float b, int dir);
+    public static native long    _nMakeCircle(float x, float y, float radius, int dir);
+    public static native long    _nMakeRRect(float l, float t, float r, float b, float[] radii, int dir, int startIndex);
+    public static native long    _nMakePolygon(float[] coords, boolean isClosed, int fillMode, boolean isVolatile);
+    public static native long    _nMakeLine(float x0, float y0, float x1, float y1);
     public static native long    _nMakeFromSVGString(String s);
+    public static native long    _nMake(int fillMode);
+    public static native long    _nMakeCopy(long ptr);
+    public static native long    _nMakeCombining(long onePtr, long twoPtr, int op);
     public static native boolean _nEquals(long aPtr, long bPtr);
     public static native boolean _nIsInterpolatable(long ptr, long comparePtr);
-    public static native long    _nMakeLerp(long ptr, long endingPtr, float weight);
+    public static native long    _nMakeInterpolate(long ptr, long endingPtr, float weight);
     public static native int     _nGetFillMode(long ptr);
-    public static native void    _nSetFillMode(long ptr, int fillMode);
+    public static native long    _nMakeWithFillMode(long ptr, int fillMode);
+    public static native boolean _nIsInverseFillType(long ptr);
+    public static native long    _nMakeToggleInverseFillType(long ptr);
     public static native boolean _nIsConvex(long ptr);
     public static native Rect    _nIsOval(long ptr);
     public static native RRect   _nIsRRect(long ptr);
-    public static native void    _nReset(long ptr);
-    public static native void    _nRewind(long ptr);
     public static native boolean _nIsEmpty(long ptr);
     public static native boolean _nIsLastContourClosed(long ptr);
     public static native boolean _nIsFinite(long ptr);
     public static native boolean _nIsVolatile(long ptr);
-    public static native void    _nSetVolatile(long ptr, boolean isVolatile);
+    public static native long    _nMakeWithVolatile(long ptr, boolean isVolatile);
     public static native boolean _nIsLineDegenerate(float x0, float y0, float x1, float y1, boolean exact);
     public static native boolean _nIsQuadDegenerate(float x0, float y0, float x1, float y1, float x2, float y2, boolean exact);
     public static native boolean _nIsCubicDegenerate(float x0, float y0, float x1, float y1, float x2, float y2, float x3, float y3, boolean exact);
     public static native Point[] _nMaybeGetAsLine(long ptr);
+    public static native Point[] _nGetPoints(long ptr);
+    public static native int[]   _nGetVerbs(long ptr);
+    public static native float[] _nGetConicWeights(long ptr);
     public static native int     _nGetPointsCount(long ptr);
-    public static native Point   _nGetPoint(long ptr, int index);
-    public static native int     _nGetPoints(long ptr, Point[] points, int max);
     public static native int     _nCountVerbs(long ptr);
-    public static native int     _nGetVerbs(long ptr, byte[] verbs, int max);
+    public static native Point   _nGetLastPt(long ptr);
     public static native long    _nApproximateBytesUsed(long ptr);
-    public static native void    _nSwap(long ptr, long otherPtr);
     public static native Rect    _nGetBounds(long ptr);
     public static native void    _nUpdateBoundsCache(long ptr);
     public static native Rect    _nComputeTightBounds(long ptr);
     public static native boolean _nConservativelyContainsRect(long ptr, float l, float t, float r, float b);
-    public static native void    _nIncReserve(long ptr, int extraPtCount);
-    public static native void    _nMoveTo(long ptr, float x, float y);
-    public static native void    _nRMoveTo(long ptr, float dx, float dy);
-    public static native void    _nLineTo(long ptr, float x, float y);
-    public static native void    _nRLineTo(long ptr, float dx, float dy);
-    public static native void    _nQuadTo(long ptr, float x1, float y1, float x2, float y2);
-    public static native void    _nRQuadTo(long ptr, float dx1, float dy1, float dx2, float dy2);
-    public static native void    _nConicTo(long ptr, float x1, float y1, float x2, float y2, float w);
-    public static native void    _nRConicTo(long ptr, float dx1, float dy1, float dx2, float dy2, float w);
-    public static native void    _nCubicTo(long ptr, float x1, float y1, float x2, float y2, float x3, float y3);
-    public static native void    _nRCubicTo(long ptr, float dx1, float dy1, float dx2, float dy2, float dx3, float dy3);
-    public static native void    _nArcTo(long ptr, float left, float top, float right, float bottom, float startAngle, float sweepAngle, boolean forceMoveTo);
-    public static native void    _nTangentArcTo(long ptr, float x1, float y1, float x2, float y2, float radius);
-    public static native void    _nEllipticalArcTo(long ptr, float rx, float ry, float xAxisRotate, int size, int direction, float x, float y);
-    public static native void    _nREllipticalArcTo(long ptr, float rx, float ry, float xAxisRotate, int size, int direction, float dx, float dy);
-    public static native void    _nClosePath(long ptr);
     public static native Point[] _nConvertConicToQuads(float x0, float y0, float x1, float y1, float x2, float y2, float w, int pow2);
     public static native Rect    _nIsRect(long ptr);
-    public static native void    _nAddRect(long ptr, float l, float t, float r, float b, int dir, int start);
-    public static native void    _nAddOval(long ptr, float l, float t, float r, float b, int dir, int start);
-    public static native void    _nAddCircle(long ptr, float x, float y, float r, int dir);
-    public static native void    _nAddArc(long ptr, float l, float t, float r, float b, float startAngle, float sweepAngle);
-    public static native void    _nAddRRect(long ptr, float l, float t, float r, float b, float[] radii, int dir, int start);
-    public static native void    _nAddPoly(long ptr, float[] coords, boolean close);
-    public static native void    _nAddPath(long ptr, long srcPtr, boolean extend);
-    public static native void    _nAddPathOffset(long ptr, long srcPtr, float dx, float dy, boolean extend);
-    public static native void    _nAddPathTransform(long ptr, long srcPtr, float[] matrix, boolean extend);
-    public static native void    _nReverseAddPath(long ptr, long srcPtr);
-    public static native void    _nOffset(long ptr, float dx, float dy, long dst);
-    public static native void    _nTransform(long ptr, float[] matrix, long dst, boolean applyPerspectiveClip);
-    public static native Point   _nGetLastPt(long ptr);
-    public static native void    _nSetLastPt(long ptr, float x, float y);
+    public static native long    _nMakeTransform(long ptr, float[] matrix);
+    public static native long    _nMakeOffset(long ptr, float dx, float dy);
+    public static native long    _nMakeScale(long ptr, float sx, float sy);
     public static native int     _nGetSegmentMasks(long ptr);
+    public static native void    _nSetVolatile(long ptr, boolean isVolatile);
+    public static native void    _nSwap(long ptr, long otherPtr);
+    public static native void    _nSetFillMode(long ptr, int fillMode);
+    public static native void    _nReset(long ptr);
     public static native boolean _nContains(long ptr, float x, float y);
     public static native void    _nDump(long ptr);
     public static native void    _nDumpHex(long ptr);
     public static native byte[]  _nSerializeToBytes(long ptr);
-    public static native long    _nMakeCombining(long onePtr, long twoPtr, int op);
     public static native long    _nMakeFromBytes(byte[] data);
     public static native int     _nGetGenerationId(long ptr);
     public static native boolean _nIsValid(long ptr);

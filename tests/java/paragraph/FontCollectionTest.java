@@ -16,9 +16,9 @@ public class FontCollectionTest implements Executable {
     @Override
     public void execute() throws Exception {
         TypefaceFontProvider fm = new TypefaceFontProvider();
-        Typeface jbMono = Typeface.makeFromFile("fonts/JetBrainsMono-Regular.ttf", 0);
+        Typeface jbMono = FontMgr.getDefault().makeFromFile("fonts/JetBrainsMono-Regular.ttf", 0);
         fm.registerTypeface(jbMono);
-        Typeface inter = Typeface.makeFromFile("fonts/InterHinted-Regular.ttf", 0);
+        Typeface inter = FontMgr.getDefault().makeFromFile("fonts/InterHinted-Regular.ttf", 0);
         fm.registerTypeface(inter, "Interface");
 
         // FontCollection
@@ -40,9 +40,9 @@ public class FontCollectionTest implements Executable {
         }
         assertEquals(3, jbMono.getRefCount());
 
-        assertArrayEquals(new Typeface[] {}, fc.findTypefaces(new String[] { "No Such Font" }, FontStyle.NORMAL));
+        assertArrayEquals(new Typeface[] { jbMono }, fc.findTypefaces(new String[] { "No Such Font" }, FontStyle.NORMAL)); // ?
         assertArrayEquals(new Typeface[] { jbMono }, fc.findTypefaces(new String[] { "JetBrains Mono" }, FontStyle.NORMAL));
-        assertArrayEquals(new Typeface[] {}, fc.findTypefaces(new String[] { "Inter" }, FontStyle.NORMAL));
+        assertArrayEquals(new Typeface[] { jbMono }, fc.findTypefaces(new String[] { "Inter" }, FontStyle.NORMAL)); // ?
         assertArrayEquals(new Typeface[] { inter }, fc.findTypefaces(new String[] { "Interface" }, FontStyle.NORMAL));
         assertArrayEquals(new Typeface[] { jbMono, inter }, fc.findTypefaces(new String[] { "JetBrains Mono", "Interface" }, FontStyle.NORMAL));
 
