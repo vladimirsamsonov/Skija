@@ -23,6 +23,7 @@ public class PathTest implements Executable {
     @Override
     public void execute() throws Exception {
         TestRunner.testMethod(this, "iter");
+        TestRunner.testMethod(this, "rawIter");
         TestRunner.testMethod(this, "convexity");
         TestRunner.testMethod(this, "isShape");
         TestRunner.testMethod(this, "checks");
@@ -67,6 +68,36 @@ public class PathTest implements Executable {
             s = i.next();
             assertEquals(PathVerb.CLOSE, s.getVerb());
             assertEquals(new Point(10, 10), s.getP0());
+
+            assertEquals(false, i.hasNext());
+            assertThrows(NoSuchElementException.class, () -> i.next());
+        }
+    }
+
+    public void rawIter() {
+        try (Path p = new Path().moveTo(10, 10).lineTo(20, 0).lineTo(20, 20).closePath();
+             var i = p.rawIterator();) {
+            assertEquals(true, i.hasNext());
+            PathSegment s = i.next();
+            assertEquals(PathVerb.MOVE, s.getVerb());
+            assertEquals(new Point(10, 10), s.getP0());
+
+            assertEquals(true, i.hasNext());
+            s = i.next();
+            assertEquals(PathVerb.LINE, s.getVerb());
+            assertEquals(new Point(10, 10), s.getP0());
+            assertEquals(new Point(20, 0), s.getP1());
+
+            assertEquals(true, i.hasNext());
+            s = i.next();
+            assertEquals(PathVerb.LINE, s.getVerb());
+            assertEquals(new Point(20, 0), s.getP0());
+            assertEquals(new Point(20, 20), s.getP1());
+
+            assertEquals(true, i.hasNext());
+            s = i.next();
+            assertEquals(PathVerb.CLOSE, s.getVerb());
+         //   assertEquals(new Point(0, 0), s.getP0());
 
             assertEquals(false, i.hasNext());
             assertThrows(NoSuchElementException.class, () -> i.next());

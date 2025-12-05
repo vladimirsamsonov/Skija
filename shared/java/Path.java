@@ -1,6 +1,8 @@
 package io.github.humbleui.skija;
 
 import org.jetbrains.annotations.*;
+
+import io.github.humbleui.skija.PathRawIterator;
 import io.github.humbleui.skija.impl.*;
 import io.github.humbleui.types.*;
 
@@ -1778,6 +1780,10 @@ public class Path extends Managed implements Iterable<PathSegment> {
 
     public PathSegmentIterator iterator(boolean forceClose) {
         return PathSegmentIterator.make(this, forceClose);
+    }
+
+    public PathRawIterator rawIterator() {
+        return PathRawIterator.make(this);
     }
 
     /**
