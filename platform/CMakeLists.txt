@@ -68,7 +68,7 @@ elseif(WIN32)
         PRIVATE "/clang:-ffile-prefix-map=${CMAKE_SOURCE_DIR}/=")
 
     # set_property(TARGET skija PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded")
-    set(CMAKE_CXX_FLAGS_RELEASE "/MT")
+    set(CMAKE_CXX_FLAGS_RELEASE "/MT /O2")
     set(CMAKE_CXX_FLAGS_DEBUG "/MTd")
     target_link_options(skija PRIVATE /INCREMENTAL:NO /NODEFAULTLIB:MSVCRT)
 endif()
